@@ -5,12 +5,15 @@ import com.poi.core.model.AttendanceStatus
 import com.poi.core.model.CheckInVisibility
 import com.poi.core.model.Event
 import com.poi.core.model.EventCategory
+import com.poi.core.model.EventReport
 import com.poi.core.model.NewEvent
 import com.poi.core.model.UserProfile
 import kotlinx.coroutines.flow.StateFlow
 
 interface EventRepository {
     val events: StateFlow<List<Event>>
+    val allEvents: StateFlow<List<Event>>
+    val reportedEvents: StateFlow<List<EventReport>>
     val attendance: StateFlow<Map<String, AttendanceStatus>>
     val checkInVisibility: StateFlow<Map<String, CheckInVisibility>>
     val settings: StateFlow<AppSettings>
@@ -24,6 +27,9 @@ interface EventRepository {
 
     suspend fun createEvent(newEvent: NewEvent): Event
     suspend fun reportEvent(eventId: String, reason: String)
+    suspend fun restoreReportedEvent(eventId: String)
+    suspend fun updateEvent(event: Event)
+    suspend fun deleteEvent(eventId: String)
     suspend fun updateSettings(settings: AppSettings)
 }
 
@@ -44,4 +50,3 @@ fun List<Event>.searchAndFilter(
         matchesCategory && matchesQuery
     }.sortedBy { it.startsAtMillis }
 }
-

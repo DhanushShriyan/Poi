@@ -38,6 +38,23 @@ enum class CheckInVisibility(val label: String) {
     ATTENDEES("People at this event"),
 }
 
+enum class ThemeMode(val label: String) {
+    LIGHT("Light"),
+    DARK("Dark"),
+}
+
+enum class AuthProvider(val label: String) {
+    GOOGLE("Google"),
+    EMAIL("Email"),
+    PHONE("Phone"),
+    ADMIN("Administrator"),
+}
+
+enum class UserRole {
+    MEMBER,
+    ADMIN,
+}
+
 data class Organizer(
     val name: String,
     val isVerified: Boolean,
@@ -62,6 +79,8 @@ data class Event(
     val themeKey: String,
     val featured: Boolean = false,
     val createdByCurrentUser: Boolean = false,
+    val isCancelled: Boolean = false,
+    val updatedAtMillis: Long? = null,
 )
 
 data class NewEvent(
@@ -73,7 +92,30 @@ data class NewEvent(
     val venue: String,
     val address: String,
     val visibility: EventVisibility,
+    val organizerName: String = "Community organizer",
 )
+
+data class EventReport(
+    val eventId: String,
+    val reason: String,
+    val reportedAtMillis: Long,
+)
+
+data class AuthUser(
+    val id: String,
+    val displayName: String,
+    val email: String? = null,
+    val phone: String? = null,
+    val provider: AuthProvider,
+    val role: UserRole = UserRole.MEMBER,
+)
+
+data class AuthSession(
+    val user: AuthUser? = null,
+) {
+    val isAuthenticated: Boolean get() = user != null
+    val isAdmin: Boolean get() = user?.role == UserRole.ADMIN
+}
 
 data class UserProfile(
     val id: String,
@@ -86,6 +128,7 @@ data class UserProfile(
 )
 
 data class AppSettings(
+    val themeMode: ThemeMode = ThemeMode.LIGHT,
     val defaultCheckInVisibility: CheckInVisibility = CheckInVisibility.FRIENDS,
     val showPlansToFriends: Boolean = true,
     val eventReminders: Boolean = true,
@@ -94,4 +137,3 @@ data class AppSettings(
 )
 
 fun Event.isLive(nowMillis: Long): Boolean = nowMillis in startsAtMillis..endsAtMillis
-

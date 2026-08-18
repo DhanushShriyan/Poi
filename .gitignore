@@ -13,6 +13,7 @@ local.properties
 *.jks
 *.keystore
 keystore.properties
+admin.properties
 google-services.json
 service-account*.json
 
