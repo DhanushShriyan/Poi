@@ -2,11 +2,15 @@
 
 ## User experience
 
-1. Install `poi-0.1.0-update-ready.apk` once.
+1. Install the latest signed Poi APK once.
 2. Poi checks the public GitHub repository's latest release when the app starts.
-3. When a newer version exists, Poi offers to download it inside the app.
+3. When a newer version exists, Poi downloads it inside the app with visible byte and percentage progress.
 4. Android asks the user to allow Poi as an installation source the first time.
 5. Android's package installer asks for final approval for every update.
+
+Downloads are bounded by connection, read, and overall timeouts. A stalled download can be cancelled or retried, and a browser download remains available as a fallback. Before opening Android's installer, Poi checks that the file is a newer build of the same package signed with the installed app's certificate.
+
+If an older release is already stuck on the download screen, install the latest signed APK manually once. The fixed updater will handle later releases from inside Poi.
 
 Silent self-installation is intentionally impossible for a normal Android app. The approval screen protects users from unauthorized software replacement.
 
