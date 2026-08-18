@@ -13,9 +13,24 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+val adminProperties = Properties().apply {
+    val propertiesFile = rootProject.file("admin.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use(::load)
+    }
+}
+
 fun signingValue(environmentName: String, propertyName: String): String? =
     providers.environmentVariable(environmentName).orNull
         ?: keystoreProperties.getProperty(propertyName)
+
+fun adminValue(environmentName: String, propertyName: String): String =
+    providers.environmentVariable(environmentName).orNull
+        ?: adminProperties.getProperty(propertyName).orEmpty()
+
+fun kotlinStringLiteral(value: String): String = "\"" + value
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"") + "\""
 
 val releaseStoreFile = signingValue("POI_KEYSTORE_PATH", "storeFile")
 val releaseStorePassword = signingValue("POI_KEYSTORE_PASSWORD", "storePassword")
@@ -30,6 +45,8 @@ val hasReleaseSigning = listOf(
 
 val poiVersionCode = providers.environmentVariable("POI_VERSION_CODE").orNull?.toIntOrNull() ?: 1
 val poiVersionName = providers.environmentVariable("POI_VERSION_NAME").orNull ?: "0.1.0"
+val adminEmail = adminValue("POI_ADMIN_EMAIL", "email")
+val adminCodeSha256 = adminValue("POI_ADMIN_CODE_SHA256", "codeSha256")
 
 android {
     namespace = "com.dhanushshriyan.poi"
@@ -41,6 +58,9 @@ android {
         targetSdk = 36
         versionCode = poiVersionCode
         versionName = poiVersionName
+
+        buildConfigField("String", "ADMIN_EMAIL", kotlinStringLiteral(adminEmail))
+        buildConfigField("String", "ADMIN_CODE_SHA256", kotlinStringLiteral(adminCodeSha256))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -97,12 +117,15 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:data"))
+    implementation(project(":core:auth"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:update"))
     implementation(project(":feature:discover"))
     implementation(project(":feature:plans"))
     implementation(project(":feature:create"))
     implementation(project(":feature:profile"))
+    implementation(project(":feature:auth"))
+    implementation(project(":feature:admin"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)

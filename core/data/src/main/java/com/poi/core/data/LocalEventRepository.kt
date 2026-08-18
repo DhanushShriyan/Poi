@@ -6,11 +6,13 @@ import com.poi.core.model.AttendanceStatus
 import com.poi.core.model.CheckInVisibility
 import com.poi.core.model.Event
 import com.poi.core.model.EventCategory
+import com.poi.core.model.EventReport
 import com.poi.core.model.EventVisibility
 import com.poi.core.model.NewEvent
 import com.poi.core.model.Organizer
 import com.poi.core.model.UserProfile
 import com.poi.core.model.VerificationLevel
+import com.poi.core.model.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,10 +25,18 @@ class LocalEventRepository(context: Context) : EventRepository {
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val seedEvents = createSeedEvents()
     private val userEvents = mutableListOf<Event>()
+    private val eventOverrides = mutableMapOf<String, Event>()
+    private val deletedIds = preferences.getStringSet(KEY_DELETED_EVENTS, emptySet()).orEmpty().toMutableSet()
     private val reportedIds = preferences.getStringSet(KEY_REPORTS, emptySet()).orEmpty().toMutableSet()
 
     private val _events = MutableStateFlow<List<Event>>(emptyList())
     override val events: StateFlow<List<Event>> = _events.asStateFlow()
+
+    private val _allEvents = MutableStateFlow<List<Event>>(emptyList())
+    override val allEvents: StateFlow<List<Event>> = _allEvents.asStateFlow()
+
+    private val _reportedEvents = MutableStateFlow<List<EventReport>>(emptyList())
+    override val reportedEvents: StateFlow<List<EventReport>> = _reportedEvents.asStateFlow()
 
     private val _attendance = MutableStateFlow(loadAttendance())
     override val attendance: StateFlow<Map<String, AttendanceStatus>> = _attendance.asStateFlow()
@@ -53,6 +63,7 @@ class LocalEventRepository(context: Context) : EventRepository {
 
     init {
         userEvents += loadUserEvents()
+        eventOverrides += loadEventOverrides().associateBy(Event::id)
         refreshEvents()
         refreshProfile()
     }
@@ -86,7 +97,7 @@ class LocalEventRepository(context: Context) : EventRepository {
             venue = newEvent.venue.trim(),
             address = newEvent.address.trim(),
             distanceKm = 0.0,
-            organizer = Organizer("Dhanush", false),
+            organizer = Organizer(newEvent.organizerName, false),
             visibility = newEvent.visibility,
             verification = VerificationLevel.COMMUNITY,
             attendeeCount = 1,
@@ -106,13 +117,57 @@ class LocalEventRepository(context: Context) : EventRepository {
         preferences.edit()
             .putStringSet(KEY_REPORTS, reportedIds)
             .putString("report_reason_$eventId", reason)
+            .putLong("report_time_$eventId", System.currentTimeMillis())
             .apply()
         refreshEvents()
+    }
+
+    override suspend fun restoreReportedEvent(eventId: String) {
+        reportedIds -= eventId
+        preferences.edit()
+            .putStringSet(KEY_REPORTS, reportedIds)
+            .remove("report_reason_$eventId")
+            .remove("report_time_$eventId")
+            .apply()
+        refreshEvents()
+    }
+
+    override suspend fun updateEvent(event: Event) {
+        val updated = event.copy(updatedAtMillis = System.currentTimeMillis())
+        val userEventIndex = userEvents.indexOfFirst { it.id == event.id }
+        if (userEventIndex >= 0) {
+            userEvents[userEventIndex] = updated
+            persistUserEvents()
+        } else {
+            require(seedEvents.any { it.id == event.id }) { "Unknown event ${event.id}" }
+            eventOverrides[event.id] = updated
+            persistEventOverrides()
+        }
+        refreshEvents()
+    }
+
+    override suspend fun deleteEvent(eventId: String) {
+        val removedUserEvent = userEvents.removeAll { it.id == eventId }
+        if (removedUserEvent) {
+            persistUserEvents()
+        } else {
+            deletedIds += eventId
+            preferences.edit().putStringSet(KEY_DELETED_EVENTS, deletedIds).apply()
+        }
+        eventOverrides.remove(eventId)
+        persistEventOverrides()
+        reportedIds.remove(eventId)
+        _attendance.value = _attendance.value - eventId
+        _checkInVisibility.value = _checkInVisibility.value - eventId
+        persistAttendance()
+        refreshEvents()
+        refreshProfile()
     }
 
     override suspend fun updateSettings(settings: AppSettings) {
         _settings.value = settings
         preferences.edit()
+            .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putString(KEY_DEFAULT_VISIBILITY, settings.defaultCheckInVisibility.name)
             .putBoolean(KEY_SHOW_PLANS, settings.showPlansToFriends)
             .putBoolean(KEY_REMINDERS, settings.eventReminders)
@@ -122,9 +177,21 @@ class LocalEventRepository(context: Context) : EventRepository {
     }
 
     private fun refreshEvents() {
-        _events.value = (seedEvents + userEvents)
-            .filterNot { it.id in reportedIds }
+        val merged = (seedEvents + userEvents)
+            .map { event -> eventOverrides[event.id] ?: event }
+            .filterNot { it.id in deletedIds }
             .sortedBy { it.startsAtMillis }
+        _allEvents.value = merged
+        _events.value = merged.filterNot { it.id in reportedIds }
+        _reportedEvents.value = reportedIds.mapNotNull { eventId ->
+            merged.firstOrNull { it.id == eventId }?.let {
+                EventReport(
+                    eventId = eventId,
+                    reason = preferences.getString("report_reason_$eventId", "Not specified").orEmpty(),
+                    reportedAtMillis = preferences.getLong("report_time_$eventId", 0L),
+                )
+            }
+        }.sortedByDescending { it.reportedAtMillis }
     }
 
     private fun refreshProfile() {
@@ -164,6 +231,9 @@ class LocalEventRepository(context: Context) : EventRepository {
     }
 
     private fun loadSettings(): AppSettings = AppSettings(
+        themeMode = runCatching {
+            ThemeMode.valueOf(preferences.getString(KEY_THEME_MODE, ThemeMode.LIGHT.name).orEmpty())
+        }.getOrDefault(ThemeMode.LIGHT),
         defaultCheckInVisibility = runCatching {
             CheckInVisibility.valueOf(
                 preferences.getString(KEY_DEFAULT_VISIBILITY, CheckInVisibility.FRIENDS.name).orEmpty(),
@@ -177,19 +247,7 @@ class LocalEventRepository(context: Context) : EventRepository {
 
     private fun persistUserEvents() {
         val array = JSONArray()
-        userEvents.forEach { event ->
-            array.put(JSONObject().apply {
-                put("id", event.id)
-                put("title", event.title)
-                put("summary", event.summary)
-                put("category", event.category.name)
-                put("starts", event.startsAtMillis)
-                put("ends", event.endsAtMillis)
-                put("venue", event.venue)
-                put("address", event.address)
-                put("visibility", event.visibility.name)
-            })
-        }
+        userEvents.forEach { event -> array.put(event.toJson()) }
         preferences.edit().putString(KEY_USER_EVENTS, array.toString()).apply()
     }
 
@@ -199,32 +257,84 @@ class LocalEventRepository(context: Context) : EventRepository {
             val array = JSONArray(encoded)
             buildList {
                 repeat(array.length()) { index ->
-                    val item = array.getJSONObject(index)
-                    val category = EventCategory.valueOf(item.getString("category"))
-                    add(
-                        Event(
-                            id = item.getString("id"),
-                            title = item.getString("title"),
-                            summary = item.getString("summary"),
-                            description = item.getString("summary"),
-                            category = category,
-                            startsAtMillis = item.getLong("starts"),
-                            endsAtMillis = item.getLong("ends"),
-                            venue = item.getString("venue"),
-                            address = item.getString("address"),
-                            distanceKm = 0.0,
-                            organizer = Organizer("Dhanush", false),
-                            visibility = EventVisibility.valueOf(item.getString("visibility")),
-                            verification = VerificationLevel.COMMUNITY,
-                            attendeeCount = 1,
-                            friendNames = emptyList(),
-                            themeKey = themeFor(category),
-                            createdByCurrentUser = true,
-                        ),
-                    )
+                    add(array.getJSONObject(index).toEvent(createdByCurrentUserFallback = true))
                 }
             }
         }.getOrDefault(emptyList())
+    }
+
+    private fun persistEventOverrides() {
+        val array = JSONArray()
+        eventOverrides.values.forEach { event -> array.put(event.toJson()) }
+        preferences.edit().putString(KEY_EVENT_OVERRIDES, array.toString()).apply()
+    }
+
+    private fun loadEventOverrides(): List<Event> {
+        val encoded = preferences.getString(KEY_EVENT_OVERRIDES, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(encoded)
+            buildList {
+                repeat(array.length()) { index -> add(array.getJSONObject(index).toEvent()) }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun Event.toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("title", title)
+        put("summary", summary)
+        put("description", description)
+        put("category", category.name)
+        put("starts", startsAtMillis)
+        put("ends", endsAtMillis)
+        put("venue", venue)
+        put("address", address)
+        put("distance", distanceKm)
+        put("organizer", organizer.name)
+        put("organizerVerified", organizer.isVerified)
+        put("visibility", visibility.name)
+        put("verification", verification.name)
+        put("attendees", attendeeCount)
+        put("friends", JSONArray(friendNames))
+        put("theme", themeKey)
+        put("featured", featured)
+        put("createdByCurrentUser", createdByCurrentUser)
+        put("cancelled", isCancelled)
+        updatedAtMillis?.let { put("updated", it) }
+    }
+
+    private fun JSONObject.toEvent(createdByCurrentUserFallback: Boolean = false): Event {
+        val category = EventCategory.valueOf(getString("category"))
+        val friends = optJSONArray("friends")
+        return Event(
+            id = getString("id"),
+            title = getString("title"),
+            summary = getString("summary"),
+            description = optString("description", getString("summary")),
+            category = category,
+            startsAtMillis = getLong("starts"),
+            endsAtMillis = getLong("ends"),
+            venue = getString("venue"),
+            address = getString("address"),
+            distanceKm = optDouble("distance", 0.0),
+            organizer = Organizer(
+                name = optString("organizer", "Community organizer"),
+                isVerified = optBoolean("organizerVerified", false),
+            ),
+            visibility = EventVisibility.valueOf(getString("visibility")),
+            verification = runCatching {
+                VerificationLevel.valueOf(optString("verification", VerificationLevel.COMMUNITY.name))
+            }.getOrDefault(VerificationLevel.COMMUNITY),
+            attendeeCount = optInt("attendees", 1),
+            friendNames = buildList {
+                if (friends != null) repeat(friends.length()) { index -> add(friends.getString(index)) }
+            },
+            themeKey = optString("theme", themeFor(category)),
+            featured = optBoolean("featured", false),
+            createdByCurrentUser = optBoolean("createdByCurrentUser", createdByCurrentUserFallback),
+            isCancelled = optBoolean("cancelled", false),
+            updatedAtMillis = if (has("updated")) optLong("updated") else null,
+        )
     }
 
     companion object {
@@ -232,7 +342,10 @@ class LocalEventRepository(context: Context) : EventRepository {
         private const val KEY_ATTENDANCE = "attendance"
         private const val KEY_CHECK_IN_VISIBILITY = "check_in_visibility"
         private const val KEY_USER_EVENTS = "user_events"
+        private const val KEY_EVENT_OVERRIDES = "event_overrides"
+        private const val KEY_DELETED_EVENTS = "deleted_events"
         private const val KEY_REPORTS = "reported_events"
+        private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DEFAULT_VISIBILITY = "default_visibility"
         private const val KEY_SHOW_PLANS = "show_plans"
         private const val KEY_REMINDERS = "reminders"
@@ -386,4 +499,3 @@ private fun themeFor(category: EventCategory): String = when (category) {
     EventCategory.PRIVATE -> "private"
     EventCategory.ALL -> "festival"
 }
-

@@ -75,6 +75,8 @@ import kotlinx.coroutines.launch
 fun EventDetailScreen(
     eventId: String,
     repository: EventRepository,
+    isAuthenticated: Boolean,
+    onSignIn: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,6 +179,23 @@ fun EventDetailScreen(
                     Spacer(Modifier.height(24.dp))
                     PoiSectionHeader("Your plan")
                     Spacer(Modifier.height(12.dp))
+                    if (!isAuthenticated) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                            shape = RoundedCornerShape(20.dp),
+                        ) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text("Keep this event close", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Sign in to save plans and share attendance with the audience you choose.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                Button(onClick = onSignIn) { Text("Sign in to plan") }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -186,7 +205,7 @@ fun EventDetailScreen(
                             selected = status == AttendanceStatus.INTERESTED,
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                scope.launch {
+                                if (!isAuthenticated) onSignIn() else scope.launch {
                                     repository.setAttendance(
                                         event.id,
                                         if (status == AttendanceStatus.INTERESTED) AttendanceStatus.NONE
@@ -200,7 +219,7 @@ fun EventDetailScreen(
                             selected = status == AttendanceStatus.GOING,
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                scope.launch {
+                                if (!isAuthenticated) onSignIn() else scope.launch {
                                     repository.setAttendance(
                                         event.id,
                                         if (status == AttendanceStatus.GOING) AttendanceStatus.NONE
@@ -212,7 +231,7 @@ fun EventDetailScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Button(
-                        onClick = { showCheckIn = true },
+                        onClick = { if (isAuthenticated) showCheckIn = true else onSignIn() },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.CheckCircle, null)

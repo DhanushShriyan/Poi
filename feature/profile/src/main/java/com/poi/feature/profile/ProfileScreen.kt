@@ -18,11 +18,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -30,8 +33,10 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,10 +50,18 @@ import com.poi.core.data.EventRepository
 import com.poi.core.designsystem.PoiInitialAvatar
 import com.poi.core.designsystem.PoiSectionHeader
 import com.poi.core.designsystem.PoiStatusPill
+import com.poi.core.model.AuthUser
+import com.poi.core.model.UserRole
 
 @Composable
 fun ProfileScreen(
     repository: EventRepository,
+    authUser: AuthUser,
+    darkMode: Boolean,
+    versionName: String,
+    onThemeChange: (Boolean) -> Unit,
+    onAdmin: () -> Unit,
+    onSignOut: () -> Unit,
     onSettings: () -> Unit,
     onSafety: () -> Unit,
     modifier: Modifier = Modifier,
@@ -62,14 +75,38 @@ fun ProfileScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PoiInitialAvatar(profile.displayName, Modifier.size(78.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                PoiInitialAvatar(authUser.displayName, Modifier.size(78.dp))
                 Spacer(Modifier.padding(8.dp))
-                Column {
-                    Text(profile.displayName, style = MaterialTheme.typography.headlineMedium)
-                    Text(profile.handle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.weight(1f)) {
+                    Text(authUser.displayName, style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        authUser.email ?: authUser.phone ?: profile.handle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Spacer(Modifier.height(6.dp))
-                    PoiStatusPill("📍 ${profile.homeArea}")
+                    PoiStatusPill("${authUser.provider.label} · ${profile.homeArea}")
+                }
+            }
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (darkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.padding(7.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (darkMode) "Dark appearance" else "Light appearance", style = MaterialTheme.typography.titleMedium)
+                        Text("Choose the look that feels comfortable", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = darkMode, onCheckedChange = onThemeChange)
                 }
             }
         }
@@ -120,6 +157,15 @@ fun ProfileScreen(
                 supporting = "Reporting, blocking and community rules",
                 onClick = onSafety,
             )
+            if (authUser.role == UserRole.ADMIN) {
+                Spacer(Modifier.height(10.dp))
+                MenuCard(
+                    icon = Icons.Default.AdminPanelSettings,
+                    title = "Administration",
+                    supporting = "Events, verification and moderation",
+                    onClick = onAdmin,
+                )
+            }
             Spacer(Modifier.height(10.dp))
             MenuCard(
                 icon = Icons.AutoMirrored.Filled.Help,
@@ -142,14 +188,25 @@ fun ProfileScreen(
                 Column(Modifier.padding(16.dp)) {
                     TrustRow(Icons.Default.VerifiedUser, "Phone", "Connect during cloud setup")
                     TrustRow(Icons.Default.People, "Community contributions", "3 helpful confirmations")
-                    TrustRow(Icons.Default.AdminPanelSettings, "Organizer status", "Not verified yet")
+                    TrustRow(
+                        Icons.Default.AdminPanelSettings,
+                        "Account role",
+                        if (authUser.role == UserRole.ADMIN) "Poi administrator" else "Community member",
+                    )
                 }
             }
         }
 
         item {
+            FilledTonalButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Icon(Icons.AutoMirrored.Filled.Logout, null)
+                Text("  Sign out")
+            }
+        }
+
+        item {
             Text(
-                "Poi test build · 0.1.0\nSupport: mjshriyan8@gmail.com",
+                "Poi $versionName · Preview build\nSupport: mjshriyan8@gmail.com",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

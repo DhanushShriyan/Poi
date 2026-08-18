@@ -53,6 +53,7 @@ private data class DateChoice(val label: String, val dayOffset: Int)
 @Composable
 fun CreateEventScreen(
     repository: EventRepository,
+    organizerName: String,
     onCreated: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -243,6 +244,7 @@ fun CreateEventScreen(
                                 venue = venue,
                                 address = address,
                                 visibility = visibility,
+                                organizerName = organizerName,
                             ),
                         )
                         saving = false
@@ -291,4 +293,3 @@ private fun VisibilityChoice(
         }
     }
 }
-

@@ -14,9 +14,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +40,7 @@ import com.poi.core.data.searchAndFilter
 import com.poi.core.designsystem.PoiEventCard
 import com.poi.core.designsystem.PoiInitialAvatar
 import com.poi.core.designsystem.PoiSectionHeader
+import com.poi.core.designsystem.PoiWordmark
 import com.poi.core.model.AttendanceStatus
 import com.poi.core.model.EventCategory
 import com.poi.core.model.isLive
@@ -43,6 +48,9 @@ import com.poi.core.model.isLive
 @Composable
 fun DiscoverScreen(
     repository: EventRepository,
+    isGuest: Boolean,
+    displayName: String?,
+    onSignIn: () -> Unit,
     onEventClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -64,14 +72,23 @@ fun DiscoverScreen(
             Column {
                 androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.weight(1f)) {
+                        PoiWordmark()
+                        Spacer(Modifier.height(14.dp))
                         Text(
-                            text = "Hello, ${profile.displayName}",
+                            text = if (isGuest) "Good to see you" else "Hello, ${displayName ?: profile.displayName}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Text("Find your next moment", style = MaterialTheme.typography.headlineLarge)
+                        Text("Find something worth showing up for", style = MaterialTheme.typography.headlineLarge)
                     }
-                    PoiInitialAvatar(profile.displayName, Modifier.size(48.dp))
+                    if (isGuest) {
+                        androidx.compose.foundation.layout.Box(
+                            Modifier.size(48.dp),
+                            contentAlignment = androidx.compose.ui.Alignment.Center,
+                        ) { Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary) }
+                    } else {
+                        PoiInitialAvatar(displayName ?: profile.displayName, Modifier.size(48.dp))
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 AssistChip(
@@ -87,6 +104,30 @@ fun DiscoverScreen(
                     ),
                     border = null,
                 )
+            }
+        }
+
+        if (isGuest) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    androidx.compose.foundation.layout.Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Browse without an account", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Sign in only when you want to save a plan or join friends.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                            )
+                        }
+                        Button(onClick = onSignIn) { Text("Sign in") }
+                    }
+                }
             }
         }
 
@@ -185,4 +226,3 @@ fun DiscoverScreen(
         }
     }
 }
-

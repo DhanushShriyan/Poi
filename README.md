@@ -4,7 +4,9 @@ Poi is a privacy-first, hyperlocal event discovery and friend-planning Android a
 
 ## Test build capabilities
 
-- Browse, search, and filter realistic nearby events.
+- Browse, search, and filter realistic nearby events before creating an account.
+- Switch between persisted light and dark appearances.
+- Preview Google, email, and phone onboarding flows.
 - See live, upcoming, verified, private, and community-submitted event states.
 - Mark events as interested, going, or checked in.
 - Keep check-in visibility private, friends-only, or event-visible.
@@ -14,8 +16,11 @@ Poi is a privacy-first, hyperlocal event discovery and friend-planning Android a
 - Report events and hide reported content locally.
 - Configure privacy and notification preferences.
 - Detect, download, and hand off signed updates from GitHub Releases.
+- Use a role-protected administrator console to review reports and edit, cancel, feature, verify, restore, or delete any event.
 
-The test build uses an offline repository with local persistence. `EventRepository` is the boundary for a later Supabase implementation, so cloud sync can be added without rewriting feature screens.
+The test build uses offline repositories with local persistence. `EventRepository` and `AuthRepository` are boundaries for later Supabase implementations, so cloud sync and verified identity can be added without rewriting feature screens.
+
+Google and phone screens in this APK are interaction previews; they do not claim to verify a real Google account or send an SMS. See [docs/ADMIN_ACCESS.md](docs/ADMIN_ACCESS.md) for restricted access and the production security boundary.
 
 ## Modules
 
@@ -24,12 +29,15 @@ The test build uses an offline repository with local persistence. `EventReposito
 | `app` | App shell, navigation, dependency assembly |
 | `core:model` | Platform-independent product models |
 | `core:data` | Repository contract and offline implementation |
+| `core:auth` | Authentication contract, preview identity, and admin policy |
 | `core:designsystem` | Theme and shared UI components |
 | `core:update` | Release checking, APK download, and installer handoff |
 | `feature:discover` | Discovery feed and event details |
 | `feature:plans` | Saved and upcoming plans |
 | `feature:create` | Event creation flow |
 | `feature:profile` | Profile, privacy, and safety settings |
+| `feature:auth` | Guest, member sign-in, and restricted access screens |
+| `feature:admin` | Moderation dashboard and full event editor |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural changes.
 

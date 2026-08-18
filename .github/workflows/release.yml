@@ -31,11 +31,15 @@ jobs:
           POI_KEYSTORE_PASSWORD: ${{ secrets.POI_KEYSTORE_PASSWORD }}
           POI_KEY_ALIAS: ${{ secrets.POI_KEY_ALIAS }}
           POI_KEY_PASSWORD: ${{ secrets.POI_KEY_PASSWORD }}
+          POI_ADMIN_EMAIL: ${{ secrets.POI_ADMIN_EMAIL }}
+          POI_ADMIN_CODE_SHA256: ${{ secrets.POI_ADMIN_CODE_SHA256 }}
         run: |
           test -n "$POI_KEYSTORE_BASE64"
           test -n "$POI_KEYSTORE_PASSWORD"
           test -n "$POI_KEY_ALIAS"
           test -n "$POI_KEY_PASSWORD"
+          test -n "$POI_ADMIN_EMAIL"
+          test "${#POI_ADMIN_CODE_SHA256}" -eq 64
 
       - name: Prepare version and signing key
         env:
@@ -51,6 +55,8 @@ jobs:
           POI_KEYSTORE_PASSWORD: ${{ secrets.POI_KEYSTORE_PASSWORD }}
           POI_KEY_ALIAS: ${{ secrets.POI_KEY_ALIAS }}
           POI_KEY_PASSWORD: ${{ secrets.POI_KEY_PASSWORD }}
+          POI_ADMIN_EMAIL: ${{ secrets.POI_ADMIN_EMAIL }}
+          POI_ADMIN_CODE_SHA256: ${{ secrets.POI_ADMIN_CODE_SHA256 }}
         run: ./gradlew lintDebug test assembleRelease --stacktrace
 
       - name: Prepare release asset

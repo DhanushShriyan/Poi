@@ -1,5 +1,6 @@
 package com.poi.core.designsystem
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -73,6 +74,45 @@ fun PoiSectionHeader(
 }
 
 @Composable
+fun PoiWordmark(modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "poi",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Box(
+            Modifier
+                .padding(start = 3.dp, top = 13.dp)
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondary),
+        )
+    }
+}
+
+@Composable
+fun PoiHeroPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(MaterialTheme.colorScheme.primary, Color(0xFF7B61FF), Color(0xFF9C6CFF)),
+                ),
+            )
+            .padding(22.dp),
+    ) {
+        content()
+    }
+}
+
+@Composable
 fun PoiStatusPill(
     text: String,
     containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
@@ -119,7 +159,7 @@ fun PoiEventArtwork(
     val colors = artworkColors(event.themeKey)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(26.dp))
             .background(Brush.linearGradient(colors)),
     ) {
         Box(
@@ -161,10 +201,9 @@ fun PoiEventCard(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        if (featured) {
-            PoiEventArtwork(event, Modifier.fillMaxWidth().height(178.dp))
-        }
+        PoiEventArtwork(event, Modifier.fillMaxWidth().height(if (featured) 184.dp else 118.dp))
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -307,5 +346,5 @@ private fun artworkColors(key: String): List<Color> = when (key) {
     "sports" -> listOf(Color(0xFF18599B), Color(0xFF22A3B8))
     "workshop" -> listOf(Color(0xFF99633A), Color(0xFFD0925D))
     "private" -> listOf(Color(0xFF6D526F), Color(0xFFA97982))
-    else -> listOf(PoiGreen, PoiCoral)
+    else -> listOf(PoiAqua, PoiCoral)
 }

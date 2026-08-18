@@ -19,6 +19,7 @@ rootProject.name = "Poi"
 include(
     ":app",
     ":core:model",
+    ":core:auth",
     ":core:data",
     ":core:designsystem",
     ":core:update",
@@ -26,4 +27,6 @@ include(
     ":feature:plans",
     ":feature:create",
     ":feature:profile",
+    ":feature:auth",
+    ":feature:admin",
 )
