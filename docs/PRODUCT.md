@@ -18,6 +18,7 @@ The offline test dataset uses Mangaluru and a local profile named Dhanush. These
 6. Create and persist a new event.
 7. Report inaccurate or unsafe content.
 8. Configure privacy and reminder preferences.
+9. Receive a newer signed build through Poi after it is published from `main`.
 
 ## Deliberately deferred until cloud setup
 
@@ -31,4 +32,3 @@ The offline test dataset uses Mangaluru and a local profile named Dhanush. These
 - Google Maps embedded map
 
 The screens expose the intended positions for these capabilities without pretending that a local APK can provide multi-user verification.
-

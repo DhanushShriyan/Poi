@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0 update delivery
+
+- Added automatic GitHub Release checks for signed production builds.
+- Added in-app APK downloading and Android installer handoff.
+- Added stable release signing support and main-branch release automation.
+- Added an isolated `core:update` module and release operations guide.
+
 ## 0.1.0-test — 2026-08-19
 
 - Added modular native Android app shell and Poi visual system.
@@ -8,4 +15,3 @@
 - Added public/private event creation with validation.
 - Added profile, trust indicators, privacy settings, reports, and safety centre.
 - Added unit tests, GitHub build workflow, privacy draft, cloud plan, and test documentation.
-

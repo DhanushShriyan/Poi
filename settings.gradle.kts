@@ -21,9 +21,9 @@ include(
     ":core:model",
     ":core:data",
     ":core:designsystem",
+    ":core:update",
     ":feature:discover",
     ":feature:plans",
     ":feature:create",
     ":feature:profile",
 )
-
