@@ -1,0 +1,25 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+
+# Local build toolchain (downloaded, never committed)
+.tooling/
+
+# Signing material and service credentials
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+service-account*.json
+
+# Generated packages
+*.apk
+*.aab
+
+# Operating system
+.DS_Store
+Thumbs.db
+

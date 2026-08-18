@@ -1,0 +1,188 @@
+package com.poi.feature.discover
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.poi.core.data.EventRepository
+import com.poi.core.data.searchAndFilter
+import com.poi.core.designsystem.PoiEventCard
+import com.poi.core.designsystem.PoiInitialAvatar
+import com.poi.core.designsystem.PoiSectionHeader
+import com.poi.core.model.AttendanceStatus
+import com.poi.core.model.EventCategory
+import com.poi.core.model.isLive
+
+@Composable
+fun DiscoverScreen(
+    repository: EventRepository,
+    onEventClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val events by repository.events.collectAsStateWithLifecycle()
+    val attendance by repository.attendance.collectAsStateWithLifecycle()
+    val profile by repository.profile.collectAsStateWithLifecycle()
+    var query by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf(EventCategory.ALL) }
+    val now = System.currentTimeMillis()
+    val filtered = remember(events, query, category) { events.searchAndFilter(query, category) }
+    val browsingAll = query.isBlank() && category == EventCategory.ALL
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 112.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Column {
+                androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Hello, ${profile.displayName}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text("Find your next moment", style = MaterialTheme.typography.headlineLarge)
+                    }
+                    PoiInitialAvatar(profile.displayName, Modifier.size(48.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                AssistChip(
+                    onClick = {},
+                    label = { Text("${profile.homeArea}  ·  Within 25 km") },
+                    leadingIcon = {
+                        Icon(Icons.Default.LocationOn, null, Modifier.size(18.dp))
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        leadingIconContentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    border = null,
+                )
+            }
+        }
+
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.large,
+                placeholder = { Text("Search events, places, organizers") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                    unfocusedIndicatorColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                ),
+            )
+        }
+
+        item {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(end = 12.dp),
+            ) {
+                items(EventCategory.entries) { item ->
+                    FilterChip(
+                        selected = category == item,
+                        onClick = { category = item },
+                        label = { Text("${item.symbol}  ${item.label}") },
+                    )
+                }
+            }
+        }
+
+        if (browsingAll) {
+            events.firstOrNull { it.featured }?.let { featured ->
+                item {
+                    PoiSectionHeader("Featured near you")
+                }
+                item {
+                    PoiEventCard(
+                        event = featured,
+                        status = attendance[featured.id] ?: AttendanceStatus.NONE,
+                        onClick = { onEventClick(featured.id) },
+                        featured = true,
+                    )
+                }
+            }
+
+            val live = events.filter { it.isLive(now) && !it.featured }
+            if (live.isNotEmpty()) {
+                item { PoiSectionHeader("Happening now") }
+                items(live, key = { it.id }) { event ->
+                    PoiEventCard(
+                        event = event,
+                        status = attendance[event.id] ?: AttendanceStatus.NONE,
+                        onClick = { onEventClick(event.id) },
+                    )
+                }
+            }
+
+            item { PoiSectionHeader("Coming up") }
+            items(events.filter { it.startsAtMillis > now && !it.featured }, key = { it.id }) { event ->
+                PoiEventCard(
+                    event = event,
+                    status = attendance[event.id] ?: AttendanceStatus.NONE,
+                    onClick = { onEventClick(event.id) },
+                )
+            }
+        } else {
+            item {
+                PoiSectionHeader("${filtered.size} matching event${if (filtered.size == 1) "" else "s"}")
+            }
+            if (filtered.isEmpty()) {
+                item {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 48.dp)) {
+                        Text("Nothing found nearby", style = MaterialTheme.typography.titleLarge)
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Try another category or a broader search.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                items(filtered, key = { it.id }) { event ->
+                    PoiEventCard(
+                        event = event,
+                        status = attendance[event.id] ?: AttendanceStatus.NONE,
+                        onClick = { onEventClick(event.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
