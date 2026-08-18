@@ -1,5 +1,6 @@
 package com.dhanushshriyan.poi
 
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,8 +23,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.poi.core.update.ApkUpdateInstaller
 import com.poi.core.update.AppUpdate
+import com.poi.core.update.DownloadProgress
 import com.poi.core.update.GitHubUpdateClient
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private enum class UpdateUiState {
     READY,
@@ -40,8 +44,11 @@ internal fun PoiUpdatePrompt() {
     val installer = remember { ApkUpdateInstaller(context.applicationContext) }
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
     var downloadedApk by remember { mutableStateOf<Uri?>(null) }
+    var downloadProgress by remember { mutableStateOf<DownloadProgress?>(null) }
+    var downloadJob by remember { mutableStateOf<Job?>(null) }
     var uiState by remember { mutableStateOf(UpdateUiState.READY) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    var downloadFailed by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         updateClient.findUpdate(BuildConfig.VERSION_NAME)
@@ -61,9 +68,29 @@ internal fun PoiUpdatePrompt() {
         }
     }
 
+    fun cancelDownload(message: String?) {
+        downloadJob?.cancel()
+        downloadJob = null
+        downloadProgress = null
+        uiState = UpdateUiState.READY
+        statusMessage = message
+    }
+
+    fun openBrowserDownload() {
+        val opened = runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
+        }.isSuccess
+        statusMessage = if (opened) {
+            "The update was opened in your browser. Download it, then approve installation."
+        } else {
+            "No browser could open the update link. Please retry inside Poi."
+        }
+    }
+
     AlertDialog(
         onDismissRequest = {
-            if (uiState != UpdateUiState.DOWNLOADING) availableUpdate = null
+            if (uiState == UpdateUiState.DOWNLOADING) cancelDownload(null)
+            availableUpdate = null
         },
         title = { Text("Poi ${update.versionName} is ready") },
         text = {
@@ -79,14 +106,38 @@ internal fun PoiUpdatePrompt() {
                     )
                 }
                 if (uiState == UpdateUiState.DOWNLOADING) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                    )
-                    Text("Downloading securely from GitHub…")
+                    val fraction = downloadProgress?.fraction
+                    if (fraction == null) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                        )
+                    }
+                    Text(downloadProgress.downloadStatus())
                 }
-                statusMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                statusMessage?.let {
+                    Text(
+                        text = it,
+                        color = if (downloadFailed) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
+                }
+                if (downloadFailed) {
+                    TextButton(onClick = ::openBrowserDownload) {
+                        Text("Open download in browser")
+                    }
+                }
             }
         },
         confirmButton = {
@@ -99,16 +150,26 @@ internal fun PoiUpdatePrompt() {
                     } else {
                         uiState = UpdateUiState.DOWNLOADING
                         statusMessage = null
-                        scope.launch {
-                            installer.download(update)
-                                .onSuccess { uri ->
-                                    downloadedApk = uri
-                                    openInstaller(uri)
+                        downloadFailed = false
+                        downloadProgress = null
+                        downloadJob = scope.launch {
+                            try {
+                                installer.download(update) { progress ->
+                                    downloadProgress = progress
                                 }
-                                .onFailure {
-                                    statusMessage = "Download failed. Check your connection and try again."
-                                }
-                            uiState = UpdateUiState.READY
+                                    .onSuccess { uri ->
+                                        downloadedApk = uri
+                                        openInstaller(uri)
+                                    }
+                                    .onFailure { error ->
+                                        downloadFailed = true
+                                        statusMessage = error.message
+                                            ?: "Download failed. Check your connection and retry."
+                                    }
+                            } finally {
+                                uiState = UpdateUiState.READY
+                                downloadJob = null
+                            }
                         }
                     }
                 },
@@ -117,6 +178,7 @@ internal fun PoiUpdatePrompt() {
                     when {
                         uiState == UpdateUiState.DOWNLOADING -> "Downloading"
                         downloadedApk != null -> "Install"
+                        downloadFailed -> "Retry download"
                         else -> "Download update"
                     },
                 )
@@ -124,11 +186,34 @@ internal fun PoiUpdatePrompt() {
         },
         dismissButton = {
             TextButton(
-                enabled = uiState != UpdateUiState.DOWNLOADING,
-                onClick = { availableUpdate = null },
+                onClick = {
+                    if (uiState == UpdateUiState.DOWNLOADING) {
+                        cancelDownload("Download cancelled. You can retry when ready.")
+                    } else {
+                        availableUpdate = null
+                    }
+                },
             ) {
-                Text("Later")
+                Text(if (uiState == UpdateUiState.DOWNLOADING) "Cancel" else "Later")
             }
         },
     )
+}
+
+private fun DownloadProgress?.downloadStatus(): String {
+    if (this == null) return "Connecting securely to GitHub…"
+    val total = totalBytes
+    val amount = formatBytes(bytesDownloaded)
+    return if (total == null) {
+        "Downloading securely from GitHub · $amount"
+    } else {
+        val percent = ((fraction ?: 0f) * 100f).roundToInt()
+        "Downloading securely from GitHub · $amount of ${formatBytes(total)} · $percent%"
+    }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024L -> "%.1f MB".format(bytes / (1024f * 1024f))
+    bytes >= 1024L -> "%.0f KB".format(bytes / 1024f)
+    else -> "$bytes B"
 }
