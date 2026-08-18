@@ -13,10 +13,10 @@ Poi uses feature modules and a repository boundary so that a requested change ca
         discover          plans   create    profile          │
              └──────────────┴───────┴─────────┴──────────────┘
                                     │
-             ┌──────────────────────┼──────────────────────┐
-             │                      │                      │
-       core:designsystem       core:data              core:model
-       theme/components      repository boundary     plain models
+             ┌────────────────┬─────┴─────────────┬────────────────┐
+             │                │                   │                │
+       core:designsystem  core:update         core:data       core:model
+       theme/components   app delivery     repository boundary plain models
 ```
 
 ## Dependency rules
@@ -27,6 +27,7 @@ Poi uses feature modules and a repository boundary so that a requested change ca
 4. Shared colors, typography, and reusable UI live only in `core:designsystem`.
 5. `app` contains navigation and dependency assembly, not feature behaviour.
 6. Service credentials are injected at build time and are never committed.
+7. Update delivery lives in `core:update`; feature modules never depend on it.
 
 These rules prevent a visual change in Create from affecting discovery logic, and prevent a backend migration from requiring screen rewrites.
 
@@ -35,6 +36,7 @@ These rules prevent a visual change in Create from affecting discovery logic, an
 - Durable product state: `EventRepository`.
 - Screen-only input such as search text and selected filters: the owning feature.
 - Navigation state: `app`.
+- Release discovery and installer handoff: `core:update`.
 - Local test persistence: `SharedPreferences` inside `LocalEventRepository`.
 - Future cloud persistence: a new repository implementation selected by `PoiApplication`.
 
@@ -50,4 +52,3 @@ To add cloud sync, implement `EventRepository` in a new data source such as `Sup
 - `app`: navigation and end-to-end smoke tests.
 
 Run `gradlew test assembleDebug` before every handoff.
-

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".PoiApplication"
         android:allowBackup="true"
@@ -10,7 +13,8 @@
         android:label="Poi"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Poi">
+        android:theme="@style/Theme.Poi"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".MainActivity"
@@ -23,4 +27,3 @@
     </application>
 
 </manifest>
-

@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PoiTheme {
                 PoiApp(repository)
+                PoiUpdatePrompt()
             }
         }
     }
@@ -171,4 +172,3 @@ private fun NavHostController.navigateTopLevel(route: String) {
         restoreState = true
     }
 }
-

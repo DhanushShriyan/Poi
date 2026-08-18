@@ -9,6 +9,7 @@ local.properties
 .tooling/
 
 # Signing material and service credentials
+.signing/
 *.jks
 *.keystore
 keystore.properties
@@ -16,10 +17,10 @@ google-services.json
 service-account*.json
 
 # Generated packages
+artifacts/
 *.apk
 *.aab
 
 # Operating system
 .DS_Store
 Thumbs.db
-
