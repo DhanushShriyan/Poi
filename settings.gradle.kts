@@ -1,4 +1,14 @@
 pluginManagement {
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+            maven { url = uri("https://storage.googleapis.com/r8-releases/raw") }
+        }
+        dependencies {
+            classpath("com.android.tools:r8:9.1.29")
+        }
+    }
     repositories {
         google()
         mavenCentral()
@@ -20,6 +30,7 @@ include(
     ":app",
     ":core:model",
     ":core:auth",
+    ":core:cloud",
     ":core:data",
     ":core:designsystem",
     ":core:update",

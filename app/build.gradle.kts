@@ -20,6 +20,13 @@ val adminProperties = Properties().apply {
     }
 }
 
+val supabaseProperties = Properties().apply {
+    val propertiesFile = rootProject.file("supabase.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use(::load)
+    }
+}
+
 fun signingValue(environmentName: String, propertyName: String): String? =
     providers.environmentVariable(environmentName).orNull
         ?: keystoreProperties.getProperty(propertyName)
@@ -27,6 +34,10 @@ fun signingValue(environmentName: String, propertyName: String): String? =
 fun adminValue(environmentName: String, propertyName: String): String =
     providers.environmentVariable(environmentName).orNull
         ?: adminProperties.getProperty(propertyName).orEmpty()
+
+fun cloudValue(environmentName: String, propertyName: String): String =
+    providers.environmentVariable(environmentName).orNull
+        ?: supabaseProperties.getProperty(propertyName).orEmpty()
 
 fun kotlinStringLiteral(value: String): String = "\"" + value
     .replace("\\", "\\\\")
@@ -36,6 +47,7 @@ val releaseStoreFile = signingValue("POI_KEYSTORE_PATH", "storeFile")
 val releaseStorePassword = signingValue("POI_KEYSTORE_PASSWORD", "storePassword")
 val releaseKeyAlias = signingValue("POI_KEY_ALIAS", "keyAlias")
 val releaseKeyPassword = signingValue("POI_KEY_PASSWORD", "keyPassword")
+val debugStoreFile = providers.environmentVariable("POI_DEBUG_KEYSTORE_PATH").orNull
 val hasReleaseSigning = listOf(
     releaseStoreFile,
     releaseStorePassword,
@@ -47,6 +59,10 @@ val poiVersionCode = providers.environmentVariable("POI_VERSION_CODE").orNull?.t
 val poiVersionName = providers.environmentVariable("POI_VERSION_NAME").orNull ?: "0.1.0"
 val adminEmail = adminValue("POI_ADMIN_EMAIL", "email")
 val adminCodeSha256 = adminValue("POI_ADMIN_CODE_SHA256", "codeSha256")
+val supabaseUrl = cloudValue("POI_SUPABASE_URL", "url")
+val supabasePublishableKey = cloudValue("POI_SUPABASE_PUBLISHABLE_KEY", "publishableKey")
+val phoneAuthEnabled = cloudValue("POI_PHONE_AUTH_ENABLED", "phoneAuthEnabled")
+    .equals("true", ignoreCase = true)
 
 android {
     namespace = "com.dhanushshriyan.poi"
@@ -61,12 +77,27 @@ android {
 
         buildConfigField("String", "ADMIN_EMAIL", kotlinStringLiteral(adminEmail))
         buildConfigField("String", "ADMIN_CODE_SHA256", kotlinStringLiteral(adminCodeSha256))
+        buildConfigField("String", "SUPABASE_URL", kotlinStringLiteral(supabaseUrl))
+        buildConfigField(
+            "String",
+            "SUPABASE_PUBLISHABLE_KEY",
+            kotlinStringLiteral(supabasePublishableKey),
+        )
+        buildConfigField("boolean", "PHONE_AUTH_ENABLED", phoneAuthEnabled.toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {
+        getByName("debug") {
+            debugStoreFile?.let { path ->
+                storeFile = rootProject.file(path)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = rootProject.file(checkNotNull(releaseStoreFile))
@@ -100,10 +131,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -116,6 +143,7 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:cloud"))
     implementation(project(":core:data"))
     implementation(project(":core:auth"))
     implementation(project(":core:designsystem"))

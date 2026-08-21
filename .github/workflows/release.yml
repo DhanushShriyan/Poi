@@ -25,21 +25,21 @@ jobs:
           cache: gradle
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Validate signing secrets
+      - name: Validate signing and cloud secrets
         env:
           POI_KEYSTORE_BASE64: ${{ secrets.POI_KEYSTORE_BASE64 }}
           POI_KEYSTORE_PASSWORD: ${{ secrets.POI_KEYSTORE_PASSWORD }}
           POI_KEY_ALIAS: ${{ secrets.POI_KEY_ALIAS }}
           POI_KEY_PASSWORD: ${{ secrets.POI_KEY_PASSWORD }}
-          POI_ADMIN_EMAIL: ${{ secrets.POI_ADMIN_EMAIL }}
-          POI_ADMIN_CODE_SHA256: ${{ secrets.POI_ADMIN_CODE_SHA256 }}
+          POI_SUPABASE_URL: ${{ secrets.POI_SUPABASE_URL }}
+          POI_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.POI_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           test -n "$POI_KEYSTORE_BASE64"
           test -n "$POI_KEYSTORE_PASSWORD"
           test -n "$POI_KEY_ALIAS"
           test -n "$POI_KEY_PASSWORD"
-          test -n "$POI_ADMIN_EMAIL"
-          test "${#POI_ADMIN_CODE_SHA256}" -eq 64
+          test -n "$POI_SUPABASE_URL"
+          test -n "$POI_SUPABASE_PUBLISHABLE_KEY"
 
       - name: Prepare version and signing key
         env:
@@ -55,8 +55,9 @@ jobs:
           POI_KEYSTORE_PASSWORD: ${{ secrets.POI_KEYSTORE_PASSWORD }}
           POI_KEY_ALIAS: ${{ secrets.POI_KEY_ALIAS }}
           POI_KEY_PASSWORD: ${{ secrets.POI_KEY_PASSWORD }}
-          POI_ADMIN_EMAIL: ${{ secrets.POI_ADMIN_EMAIL }}
-          POI_ADMIN_CODE_SHA256: ${{ secrets.POI_ADMIN_CODE_SHA256 }}
+          POI_SUPABASE_URL: ${{ secrets.POI_SUPABASE_URL }}
+          POI_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.POI_SUPABASE_PUBLISHABLE_KEY }}
+          POI_PHONE_AUTH_ENABLED: ${{ secrets.POI_PHONE_AUTH_ENABLED }}
         run: ./gradlew lintDebug test assembleRelease --stacktrace
 
       - name: Prepare release asset

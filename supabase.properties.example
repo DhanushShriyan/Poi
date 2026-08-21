@@ -1,0 +1,4 @@
+# Copy this file to supabase.properties. The destination is ignored by Git.
+url=https://YOUR_PROJECT_REF.supabase.co
+publishableKey=YOUR_PUBLISHABLE_KEY
+phoneAuthEnabled=false

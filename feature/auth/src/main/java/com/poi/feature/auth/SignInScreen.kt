@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,11 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.poi.core.auth.AuthRepository
 import com.poi.core.designsystem.PoiHeroPanel
 import kotlinx.coroutines.launch
 
-private enum class SignInMethod { CHOOSE, GOOGLE, EMAIL, PHONE }
+private enum class SignInMethod { CHOOSE, EMAIL, PHONE }
 
 @androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
@@ -54,20 +56,30 @@ fun SignInScreen(
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var createAccount by remember { mutableStateOf(false) }
     var phone by remember { mutableStateOf("+91 ") }
     var code by remember { mutableStateOf("") }
     var phoneCodeSent by remember { mutableStateOf(false) }
     var previewCode by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    val session by authRepository.session.collectAsStateWithLifecycle()
+    LaunchedEffect(session.isAuthenticated) {
+        if (session.isAuthenticated) onSignedIn()
+    }
 
     fun complete(block: suspend () -> Result<*>) {
         loading = true
         error = null
+        status = null
         scope.launch {
             block().fold(
-                onSuccess = { onSignedIn() },
+                onSuccess = {
+                    if (authRepository.session.value.isAuthenticated) onSignedIn()
+                },
                 onFailure = { error = it.message ?: "Sign-in could not be completed" },
             )
             loading = false
@@ -121,7 +133,23 @@ fun SignInScreen(
                 SignInMethod.CHOOSE -> {
                     item {
                         OutlinedButton(
-                            onClick = { method = SignInMethod.GOOGLE },
+                            enabled = !loading && !authRepository.usesPreviewIdentity,
+                            onClick = {
+                                loading = true
+                                error = null
+                                status = null
+                                scope.launch {
+                                    authRepository.signInWithGoogle().fold(
+                                        onSuccess = {
+                                            status = "Complete Google sign-in in the secure browser window."
+                                        },
+                                        onFailure = {
+                                            error = it.message ?: "Google sign-in could not be started"
+                                        },
+                                    )
+                                    loading = false
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                         ) {
                             Icon(Icons.Default.AlternateEmail, null)
@@ -140,28 +168,38 @@ fun SignInScreen(
                         Spacer(Modifier.height(10.dp))
                         OutlinedButton(
                             onClick = { method = SignInMethod.PHONE },
+                            enabled = authRepository.supportsPhoneSignIn,
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                         ) {
                             Icon(Icons.Default.PhoneAndroid, null)
                             Spacer(Modifier.padding(5.dp))
                             Text("Continue with phone")
                         }
+                        if (!authRepository.supportsPhoneSignIn) {
+                            Text(
+                                "Phone verification will appear when the SMS provider is enabled.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
-                SignInMethod.GOOGLE, SignInMethod.EMAIL -> {
+                SignInMethod.EMAIL -> {
                     item {
                         Text(
-                            if (method == SignInMethod.GOOGLE) "Google account" else "Email account",
+                            if (createAccount) "Create your account" else "Email account",
                             style = MaterialTheme.typography.titleLarge,
                         )
-                        Spacer(Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it.take(60) },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Your name") },
-                            singleLine = true,
-                        )
+                        if (createAccount) {
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it.take(60) },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Your name") },
+                                singleLine = true,
+                            )
+                        }
                         Spacer(Modifier.height(10.dp))
                         OutlinedTextField(
                             value = email,
@@ -170,28 +208,51 @@ fun SignInScreen(
                             label = { Text("Email address") },
                             singleLine = true,
                         )
-                        if (method == SignInMethod.EMAIL) {
-                            Spacer(Modifier.height(10.dp))
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it.take(80) },
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text("Password") },
-                                visualTransformation = PasswordVisualTransformation(),
-                                singleLine = true,
-                            )
-                        }
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it.take(80) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Password") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true,
+                        )
                         Spacer(Modifier.height(16.dp))
                         Button(
                             enabled = !loading,
                             onClick = {
                                 complete {
-                                    if (method == SignInMethod.GOOGLE) authRepository.signInWithGoogle(email, name)
-                                    else authRepository.signInWithEmail(email, password, name)
+                                    if (createAccount) {
+                                        authRepository.createAccountWithEmail(email, password, name)
+                                            .onSuccess { result ->
+                                                if (result.requiresEmailConfirmation) {
+                                                    status = "Check your email to confirm your account, then return to Poi."
+                                                }
+                                            }
+                                    } else {
+                                        authRepository.signInWithEmail(email, password)
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
-                        ) { Text(if (loading) "Signing in…" else "Continue") }
+                        ) {
+                            Text(
+                                when {
+                                    loading -> "Please wait…"
+                                    createAccount -> "Create account"
+                                    else -> "Sign in"
+                                },
+                            )
+                        }
+                        TextButton(
+                            onClick = { createAccount = !createAccount },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (createAccount) "Already have an account? Sign in"
+                                else "New to Poi? Create an account",
+                            )
+                        }
                     }
                 }
                 SignInMethod.PHONE -> {
@@ -244,6 +305,9 @@ fun SignInScreen(
 
             error?.let { message ->
                 item { Text(message, color = MaterialTheme.colorScheme.error) }
+            }
+            status?.let { message ->
+                item { Text(message, color = MaterialTheme.colorScheme.primary) }
             }
 
             item {
