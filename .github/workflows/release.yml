@@ -47,8 +47,8 @@ jobs:
         run: |
           printf '%s' "$POI_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/poi-update.jks"
           echo "POI_KEYSTORE_PATH=$RUNNER_TEMP/poi-update.jks" >> "$GITHUB_ENV"
-          echo "POI_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-          echo "POI_VERSION_NAME=0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "POI_VERSION_CODE=$((2000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "POI_VERSION_NAME=0.2.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
       - name: Test and build signed update
         env:
