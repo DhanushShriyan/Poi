@@ -24,11 +24,13 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -81,6 +83,7 @@ fun GuestProfileScreen(
     onThemeChange: (Boolean) -> Unit,
     onSignIn: () -> Unit,
     onAdminAccess: () -> Unit,
+    onAppUpdates: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -120,6 +123,12 @@ fun GuestProfileScreen(
             GuestBenefit(Icons.Default.Groups, "Know who's joining", "See friend activity only when people choose to share.")
             GuestBenefit(Icons.Default.NotificationsActive, "Timely reminders", "Get useful updates without notification noise.")
             GuestBenefit(Icons.Default.AutoAwesome, "Build your event story", "Host events and collect trusted contributions.")
+        }
+        item {
+            OutlinedButton(onClick = onAppUpdates, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.SystemUpdateAlt, null)
+                Text("  Check app updates")
+            }
         }
         item {
             Text(

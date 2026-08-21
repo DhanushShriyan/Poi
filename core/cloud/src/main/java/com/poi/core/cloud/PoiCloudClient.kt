@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.handleDeeplinks
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.storage.Storage
 
 data class PoiCloudConfig(
     val projectUrl: String,
@@ -39,6 +40,7 @@ class PoiCloudClient private constructor(
                     }
                     install(Postgrest)
                     install(Realtime)
+                    install(Storage)
                 },
             )
         }

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -64,6 +65,7 @@ fun ProfileScreen(
     onSignOut: () -> Unit,
     onSettings: () -> Unit,
     onSafety: () -> Unit,
+    onAppUpdates: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val profile by repository.profile.collectAsStateWithLifecycle()
@@ -144,6 +146,13 @@ fun ProfileScreen(
         item {
             PoiSectionHeader("Account & safety")
             Spacer(Modifier.height(8.dp))
+            MenuCard(
+                icon = Icons.Default.SystemUpdateAlt,
+                title = "App updates",
+                supporting = "Installed $versionName · check the latest Poi release",
+                onClick = onAppUpdates,
+            )
+            Spacer(Modifier.height(10.dp))
             MenuCard(
                 icon = Icons.Default.PrivacyTip,
                 title = "Privacy & notifications",

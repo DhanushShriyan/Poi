@@ -39,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.poi.core.auth.AuthRepository
 import com.poi.core.data.EventRepository
+import com.poi.core.data.MomentRepository
 import com.poi.core.designsystem.PoiTheme
 import com.poi.core.model.ThemeMode
 import com.poi.feature.admin.AdminDashboardScreen
@@ -65,7 +66,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by application.eventRepository.settings.collectAsStateWithLifecycle()
             PoiTheme(darkTheme = settings.themeMode == ThemeMode.DARK) {
-                PoiApp(application.eventRepository, application.authRepository)
+                PoiApp(
+                    application.eventRepository,
+                    application.authRepository,
+                    application.momentRepository,
+                )
                 PoiUpdatePrompt()
             }
         }
@@ -86,6 +91,7 @@ private object Routes {
     const val Event = "event/{eventId}"
     const val Settings = "settings"
     const val Safety = "safety"
+    const val AppUpdates = "app-updates"
     const val SignIn = "sign-in"
     const val AdminAccess = "restricted-account-access"
     const val Admin = "admin"
@@ -111,7 +117,11 @@ private val topDestinations = listOf(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun PoiApp(repository: EventRepository, authRepository: AuthRepository) {
+private fun PoiApp(
+    repository: EventRepository,
+    authRepository: AuthRepository,
+    momentRepository: MomentRepository,
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -182,6 +192,7 @@ private fun PoiApp(repository: EventRepository, authRepository: AuthRepository) 
                         onThemeChange = setDarkMode,
                         onSignIn = signIn,
                         onAdminAccess = { navController.navigate(Routes.AdminAccess) },
+                        onAppUpdates = { navController.navigate(Routes.AppUpdates) },
                     )
                 } else {
                     ProfileScreen(
@@ -199,6 +210,7 @@ private fun PoiApp(repository: EventRepository, authRepository: AuthRepository) 
                         },
                         onSettings = { navController.navigate(Routes.Settings) },
                         onSafety = { navController.navigate(Routes.Safety) },
+                        onAppUpdates = { navController.navigate(Routes.AppUpdates) },
                     )
                 }
             }
@@ -209,6 +221,7 @@ private fun PoiApp(repository: EventRepository, authRepository: AuthRepository) 
                 EventDetailScreen(
                     eventId = entry.arguments?.getString("eventId").orEmpty(),
                     repository = repository,
+                    momentRepository = momentRepository,
                     isAuthenticated = session.isAuthenticated,
                     onSignIn = signIn,
                     onBack = { navController.popBackStack() },
@@ -272,6 +285,9 @@ private fun PoiApp(repository: EventRepository, authRepository: AuthRepository) 
             }
             composable(Routes.Safety) {
                 SafetyScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.AppUpdates) {
+                AppUpdateScreen(onBack = { navController.popBackStack() })
             }
         }
     }

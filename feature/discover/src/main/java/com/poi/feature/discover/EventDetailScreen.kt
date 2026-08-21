@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -58,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.poi.core.data.EventRepository
+import com.poi.core.data.MomentRepository
 import com.poi.core.designsystem.PoiEventArtwork
 import com.poi.core.designsystem.PoiInitialAvatar
 import com.poi.core.designsystem.PoiSectionHeader
@@ -75,6 +75,7 @@ import kotlinx.coroutines.launch
 fun EventDetailScreen(
     eventId: String,
     repository: EventRepository,
+    momentRepository: MomentRepository,
     isAuthenticated: Boolean,
     onSignIn: () -> Unit,
     onBack: () -> Unit,
@@ -273,33 +274,14 @@ fun EventDetailScreen(
                     )
 
                     Spacer(Modifier.height(24.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        ),
-                        shape = RoundedCornerShape(22.dp),
-                    ) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.PhotoCamera,
-                                null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(32.dp),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text("Event moments", style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    if (status == AttendanceStatus.HERE || status == AttendanceStatus.ATTENDED) {
-                                        "You can add a moment after the cloud photo store is connected."
-                                    } else {
-                                        "Check in to contribute photos to this event."
-                                    },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                        }
-                    }
+                    EventMomentsSection(
+                        eventId = event.id,
+                        eventTitle = event.title,
+                        repository = momentRepository,
+                        attendanceStatus = status,
+                        isAuthenticated = isAuthenticated,
+                        onSignIn = onSignIn,
+                    )
 
                     Spacer(Modifier.height(24.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {

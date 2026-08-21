@@ -9,7 +9,10 @@ import com.poi.core.cloud.PoiCloudClient
 import com.poi.core.cloud.PoiCloudConfig
 import com.poi.core.data.EventRepository
 import com.poi.core.data.LocalEventRepository
+import com.poi.core.data.LocalMomentRepository
+import com.poi.core.data.MomentRepository
 import com.poi.core.data.SupabaseEventRepository
+import com.poi.core.data.SupabaseMomentRepository
 
 class PoiApplication : Application() {
     private val cloudClient: PoiCloudClient? by lazy {
@@ -38,5 +41,11 @@ class PoiApplication : Application() {
         cloudClient?.let { cloud ->
             SupabaseEventRepository(applicationContext, cloud, authRepository)
         } ?: LocalEventRepository(applicationContext)
+    }
+
+    val momentRepository: MomentRepository by lazy {
+        cloudClient?.let { cloud ->
+            SupabaseMomentRepository(cloud, authRepository)
+        } ?: LocalMomentRepository()
     }
 }
