@@ -1,6 +1,7 @@
 package com.poi.core.auth
 
 import android.content.Context
+import android.content.Intent
 import com.poi.core.model.AuthProvider
 import com.poi.core.model.AuthSession
 import com.poi.core.model.AuthUser
@@ -26,19 +27,31 @@ class LocalAuthRepository(
     private val _session = MutableStateFlow(loadSession())
     override val session: StateFlow<AuthSession> = _session.asStateFlow()
     override val usesPreviewIdentity: Boolean = true
+    override val supportsPhoneSignIn: Boolean = true
     private var pendingPhone: String? = null
     private var pendingCode: String? = null
 
-    override suspend fun signInWithGoogle(email: String, displayName: String): Result<AuthUser> =
-        createMember(email, displayName, AuthProvider.GOOGLE)
+    override fun handleAuthCallback(intent: Intent) = Unit
+
+    override suspend fun signInWithGoogle(): Result<Unit> =
+        createMember("member@gmail.com", "Poi member", AuthProvider.GOOGLE).map { }
 
     override suspend fun signInWithEmail(
         email: String,
         password: String,
-        displayName: String,
     ): Result<AuthUser> {
         if (password.length < 6) return Result.failure(IllegalArgumentException("Use at least 6 characters"))
+        return createMember(email, "", AuthProvider.EMAIL)
+    }
+
+    override suspend fun createAccountWithEmail(
+        email: String,
+        password: String,
+        displayName: String,
+    ): Result<EmailAccountResult> {
+        if (password.length < 6) return Result.failure(IllegalArgumentException("Use at least 6 characters"))
         return createMember(email, displayName, AuthProvider.EMAIL)
+            .map { EmailAccountResult(user = it, requiresEmailConfirmation = false) }
     }
 
     override suspend fun requestPhoneCode(phone: String): Result<PhoneChallenge> = runCatching {

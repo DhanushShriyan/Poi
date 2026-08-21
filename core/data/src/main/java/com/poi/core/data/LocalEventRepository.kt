@@ -168,6 +168,7 @@ class LocalEventRepository(context: Context) : EventRepository {
         _settings.value = settings
         preferences.edit()
             .putString(KEY_THEME_MODE, settings.themeMode.name)
+            .putInt(KEY_DISCOVERY_RADIUS_KM, settings.discoveryRadiusKm ?: ANY_DISTANCE)
             .putString(KEY_DEFAULT_VISIBILITY, settings.defaultCheckInVisibility.name)
             .putBoolean(KEY_SHOW_PLANS, settings.showPlansToFriends)
             .putBoolean(KEY_REMINDERS, settings.eventReminders)
@@ -234,6 +235,8 @@ class LocalEventRepository(context: Context) : EventRepository {
         themeMode = runCatching {
             ThemeMode.valueOf(preferences.getString(KEY_THEME_MODE, ThemeMode.LIGHT.name).orEmpty())
         }.getOrDefault(ThemeMode.LIGHT),
+        discoveryRadiusKm = preferences.getInt(KEY_DISCOVERY_RADIUS_KM, 25)
+            .takeUnless { it == ANY_DISTANCE },
         defaultCheckInVisibility = runCatching {
             CheckInVisibility.valueOf(
                 preferences.getString(KEY_DEFAULT_VISIBILITY, CheckInVisibility.FRIENDS.name).orEmpty(),
@@ -346,11 +349,13 @@ class LocalEventRepository(context: Context) : EventRepository {
         private const val KEY_DELETED_EVENTS = "deleted_events"
         private const val KEY_REPORTS = "reported_events"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_DISCOVERY_RADIUS_KM = "discovery_radius_km"
         private const val KEY_DEFAULT_VISIBILITY = "default_visibility"
         private const val KEY_SHOW_PLANS = "show_plans"
         private const val KEY_REMINDERS = "reminders"
         private const val KEY_DIGEST = "weekly_digest"
         private const val KEY_FRIEND_ACTIVITY = "friend_activity"
+        private const val ANY_DISTANCE = -1
     }
 }
 

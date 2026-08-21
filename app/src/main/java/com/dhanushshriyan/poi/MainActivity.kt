@@ -1,5 +1,6 @@
 package com.dhanushshriyan.poi
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val application = application as PoiApplication
+        application.authRepository.handleAuthCallback(intent)
         setContent {
             val settings by application.eventRepository.settings.collectAsStateWithLifecycle()
             PoiTheme(darkTheme = settings.themeMode == ThemeMode.DARK) {
@@ -67,6 +69,12 @@ class MainActivity : ComponentActivity() {
                 PoiUpdatePrompt()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        (application as PoiApplication).authRepository.handleAuthCallback(intent)
     }
 }
 

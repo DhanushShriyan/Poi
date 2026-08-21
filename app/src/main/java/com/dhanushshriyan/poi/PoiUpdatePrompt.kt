@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.poi.core.update.ApkUpdateInstaller
 import com.poi.core.update.AppUpdate
 import com.poi.core.update.DownloadProgress
@@ -77,8 +78,11 @@ internal fun PoiUpdatePrompt() {
     }
 
     fun openBrowserDownload() {
+        if (uiState == UpdateUiState.DOWNLOADING) {
+            cancelDownload(null)
+        }
         val opened = runCatching {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
+            context.startActivity(Intent(Intent.ACTION_VIEW, update.downloadUrl.toUri()))
         }.isSuccess
         statusMessage = if (opened) {
             "The update was opened in your browser. Download it, then approve installation."
@@ -95,6 +99,11 @@ internal fun PoiUpdatePrompt() {
         title = { Text("Poi ${update.versionName} is ready") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Installed ${BuildConfig.VERSION_NAME}  •  Available ${update.versionName}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Text(
                     text = "Download this update inside Poi. Android will ask you to approve installation.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -133,10 +142,14 @@ internal fun PoiUpdatePrompt() {
                         },
                     )
                 }
-                if (downloadFailed) {
-                    TextButton(onClick = ::openBrowserDownload) {
-                        Text("Open download in browser")
-                    }
+                TextButton(onClick = ::openBrowserDownload) {
+                    Text(
+                        if (uiState == UpdateUiState.DOWNLOADING) {
+                            "Use browser download instead"
+                        } else {
+                            "Download in browser"
+                        },
+                    )
                 }
             }
         },

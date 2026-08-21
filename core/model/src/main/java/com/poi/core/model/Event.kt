@@ -129,6 +129,7 @@ data class UserProfile(
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.LIGHT,
+    val discoveryRadiusKm: Int? = 25,
     val defaultCheckInVisibility: CheckInVisibility = CheckInVisibility.FRIENDS,
     val showPlansToFriends: Boolean = true,
     val eventReminders: Boolean = true,

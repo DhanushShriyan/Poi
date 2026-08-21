@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,11 +27,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -44,6 +47,7 @@ import com.poi.core.designsystem.PoiWordmark
 import com.poi.core.model.AttendanceStatus
 import com.poi.core.model.EventCategory
 import com.poi.core.model.isLive
+import kotlinx.coroutines.launch
 
 @Composable
 fun DiscoverScreen(
@@ -57,10 +61,19 @@ fun DiscoverScreen(
     val events by repository.events.collectAsStateWithLifecycle()
     val attendance by repository.attendance.collectAsStateWithLifecycle()
     val profile by repository.profile.collectAsStateWithLifecycle()
+    val settings by repository.settings.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(EventCategory.ALL) }
+    var showRadiusPicker by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val now = System.currentTimeMillis()
-    val filtered = remember(events, query, category) { events.searchAndFilter(query, category) }
+    val nearbyEvents = remember(events, settings.discoveryRadiusKm) {
+        val radius = settings.discoveryRadiusKm
+        if (radius == null) events else events.filter { it.distanceKm <= radius }
+    }
+    val filtered = remember(nearbyEvents, query, category) {
+        nearbyEvents.searchAndFilter(query, category)
+    }
     val browsingAll = query.isBlank() && category == EventCategory.ALL
 
     LazyColumn(
@@ -92,8 +105,13 @@ fun DiscoverScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 AssistChip(
-                    onClick = {},
-                    label = { Text("${profile.homeArea}  ·  Within 25 km") },
+                    onClick = { showRadiusPicker = true },
+                    label = {
+                        Text(
+                            "${profile.homeArea}  ·  " +
+                                (settings.discoveryRadiusKm?.let { "Within $it km" } ?: "Any distance"),
+                        )
+                    },
                     leadingIcon = {
                         Icon(Icons.Default.LocationOn, null, Modifier.size(18.dp))
                     },
@@ -165,7 +183,7 @@ fun DiscoverScreen(
         }
 
         if (browsingAll) {
-            events.firstOrNull { it.featured }?.let { featured ->
+            nearbyEvents.firstOrNull { it.featured }?.let { featured ->
                 item {
                     PoiSectionHeader("Featured near you")
                 }
@@ -179,7 +197,7 @@ fun DiscoverScreen(
                 }
             }
 
-            val live = events.filter { it.isLive(now) && !it.featured }
+            val live = nearbyEvents.filter { it.isLive(now) && !it.featured }
             if (live.isNotEmpty()) {
                 item { PoiSectionHeader("Happening now") }
                 items(live, key = { it.id }) { event ->
@@ -192,7 +210,7 @@ fun DiscoverScreen(
             }
 
             item { PoiSectionHeader("Coming up") }
-            items(events.filter { it.startsAtMillis > now && !it.featured }, key = { it.id }) { event ->
+            items(nearbyEvents.filter { it.startsAtMillis > now && !it.featured }, key = { it.id }) { event ->
                 PoiEventCard(
                     event = event,
                     status = attendance[event.id] ?: AttendanceStatus.NONE,
@@ -224,5 +242,36 @@ fun DiscoverScreen(
                 }
             }
         }
+    }
+
+    if (showRadiusPicker) {
+        AlertDialog(
+            onDismissRequest = { showRadiusPicker = false },
+            title = { Text("Choose your discovery distance") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Poi will show events within this distance from your selected area.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    listOf<Int?>(5, 10, 25, 50, 100, null).forEach { radius ->
+                        FilterChip(
+                            selected = settings.discoveryRadiusKm == radius,
+                            onClick = {
+                                scope.launch {
+                                    repository.updateSettings(settings.copy(discoveryRadiusKm = radius))
+                                }
+                                showRadiusPicker = false
+                            },
+                            label = { Text(radius?.let { "Within $it km" } ?: "Any distance") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRadiusPicker = false }) { Text("Close") }
+            },
+        )
     }
 }

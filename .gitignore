@@ -1,5 +1,6 @@
 # Android / Gradle
 .gradle/
+.kotlin/
 **/build/
 local.properties
 *.iml
@@ -14,6 +15,8 @@ local.properties
 *.keystore
 keystore.properties
 admin.properties
+supabase.properties
+supabase/.temp/
 google-services.json
 service-account*.json
 
