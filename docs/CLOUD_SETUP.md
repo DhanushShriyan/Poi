@@ -42,6 +42,7 @@ Copy `supabase.properties.example` to the ignored `supabase.properties` file and
 ```properties
 url=https://YOUR_PROJECT_REF.supabase.co
 publishableKey=YOUR_PUBLISHABLE_KEY
+googleAuthEnabled=false
 phoneAuthEnabled=false
 ```
 
@@ -49,6 +50,7 @@ Environment variables are also supported:
 
 - `POI_SUPABASE_URL`
 - `POI_SUPABASE_PUBLISHABLE_KEY`
+- `POI_GOOGLE_AUTH_ENABLED`
 - `POI_PHONE_AUTH_ENABLED`
 
 ## 5. Configure automatic releases
@@ -57,6 +59,7 @@ Add these GitHub Actions repository secrets:
 
 - `POI_SUPABASE_URL`
 - `POI_SUPABASE_PUBLISHABLE_KEY`
+- `POI_GOOGLE_AUTH_ENABLED` (`false` until Google OAuth is configured)
 - `POI_PHONE_AUTH_ENABLED` (`false` until SMS is configured)
 
 The release workflow injects the public client configuration into the signed APK. Existing signing secrets remain unchanged.

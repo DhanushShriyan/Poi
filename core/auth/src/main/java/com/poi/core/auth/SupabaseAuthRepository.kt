@@ -30,6 +30,7 @@ import kotlinx.serialization.json.put
 
 class SupabaseAuthRepository(
     private val cloud: PoiCloudClient,
+    override val supportsGoogleSignIn: Boolean,
     override val supportsPhoneSignIn: Boolean,
 ) : AuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -55,6 +56,7 @@ class SupabaseAuthRepository(
     }
 
     override suspend fun signInWithGoogle(): Result<Unit> = runCatching {
+        check(supportsGoogleSignIn) { "Google sign-in is not enabled yet." }
         cloud.supabase.auth.signInWith(Google)
     }
 

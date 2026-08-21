@@ -57,6 +57,7 @@ jobs:
           POI_KEY_PASSWORD: ${{ secrets.POI_KEY_PASSWORD }}
           POI_SUPABASE_URL: ${{ secrets.POI_SUPABASE_URL }}
           POI_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.POI_SUPABASE_PUBLISHABLE_KEY }}
+          POI_GOOGLE_AUTH_ENABLED: ${{ secrets.POI_GOOGLE_AUTH_ENABLED }}
           POI_PHONE_AUTH_ENABLED: ${{ secrets.POI_PHONE_AUTH_ENABLED }}
         run: ./gradlew lintDebug test assembleRelease --stacktrace
 

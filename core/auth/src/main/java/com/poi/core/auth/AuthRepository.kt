@@ -25,6 +25,7 @@ data class EmailAccountResult(
 interface AuthRepository {
     val session: StateFlow<AuthSession>
     val usesPreviewIdentity: Boolean
+    val supportsGoogleSignIn: Boolean
     val supportsPhoneSignIn: Boolean
 
     fun handleAuthCallback(intent: Intent)
