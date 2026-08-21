@@ -133,7 +133,7 @@ fun SignInScreen(
                 SignInMethod.CHOOSE -> {
                     item {
                         OutlinedButton(
-                            enabled = !loading && !authRepository.usesPreviewIdentity,
+                            enabled = !loading && authRepository.supportsGoogleSignIn,
                             onClick = {
                                 loading = true
                                 error = null
@@ -155,6 +155,13 @@ fun SignInScreen(
                             Icon(Icons.Default.AlternateEmail, null)
                             Spacer(Modifier.padding(5.dp))
                             Text("Continue with Google")
+                        }
+                        if (!authRepository.supportsGoogleSignIn) {
+                            Text(
+                                "Google sign-in will activate when its OAuth provider is connected.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         Spacer(Modifier.height(10.dp))
                         OutlinedButton(

@@ -23,7 +23,11 @@ class PoiApplication : Application() {
 
     val authRepository: AuthRepository by lazy {
         cloudClient?.let { cloud ->
-            SupabaseAuthRepository(cloud, supportsPhoneSignIn = BuildConfig.PHONE_AUTH_ENABLED)
+            SupabaseAuthRepository(
+                cloud = cloud,
+                supportsGoogleSignIn = BuildConfig.GOOGLE_AUTH_ENABLED,
+                supportsPhoneSignIn = BuildConfig.PHONE_AUTH_ENABLED,
+            )
         } ?: LocalAuthRepository(
                 applicationContext,
                 AdminPolicy(BuildConfig.ADMIN_EMAIL, BuildConfig.ADMIN_CODE_SHA256),

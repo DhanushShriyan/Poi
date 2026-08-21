@@ -27,6 +27,7 @@ class LocalAuthRepository(
     private val _session = MutableStateFlow(loadSession())
     override val session: StateFlow<AuthSession> = _session.asStateFlow()
     override val usesPreviewIdentity: Boolean = true
+    override val supportsGoogleSignIn: Boolean = false
     override val supportsPhoneSignIn: Boolean = true
     private var pendingPhone: String? = null
     private var pendingCode: String? = null

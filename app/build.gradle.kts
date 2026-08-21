@@ -61,6 +61,8 @@ val adminEmail = adminValue("POI_ADMIN_EMAIL", "email")
 val adminCodeSha256 = adminValue("POI_ADMIN_CODE_SHA256", "codeSha256")
 val supabaseUrl = cloudValue("POI_SUPABASE_URL", "url")
 val supabasePublishableKey = cloudValue("POI_SUPABASE_PUBLISHABLE_KEY", "publishableKey")
+val googleAuthEnabled = cloudValue("POI_GOOGLE_AUTH_ENABLED", "googleAuthEnabled")
+    .equals("true", ignoreCase = true)
 val phoneAuthEnabled = cloudValue("POI_PHONE_AUTH_ENABLED", "phoneAuthEnabled")
     .equals("true", ignoreCase = true)
 
@@ -83,6 +85,7 @@ android {
             "SUPABASE_PUBLISHABLE_KEY",
             kotlinStringLiteral(supabasePublishableKey),
         )
+        buildConfigField("boolean", "GOOGLE_AUTH_ENABLED", googleAuthEnabled.toString())
         buildConfigField("boolean", "PHONE_AUTH_ENABLED", phoneAuthEnabled.toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
