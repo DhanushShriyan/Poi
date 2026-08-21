@@ -23,5 +23,6 @@ dependencies {
     api("io.github.jan-tennert.supabase:auth-kt")
     api("io.github.jan-tennert.supabase:postgrest-kt")
     api("io.github.jan-tennert.supabase:realtime-kt")
+    api("io.github.jan-tennert.supabase:storage-kt")
     implementation(libs.ktor.client.okhttp)
 }

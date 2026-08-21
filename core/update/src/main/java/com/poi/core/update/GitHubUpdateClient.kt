@@ -10,7 +10,7 @@ class GitHubUpdateClient(
     private val latestReleaseUrl: String =
         "https://api.github.com/repos/DhanushShriyan/Poi/releases/latest",
 ) {
-    suspend fun findUpdate(currentVersion: String): Result<AppUpdate?> = runCatching {
+    suspend fun latestRelease(): Result<AppUpdate?> = runCatching {
         withContext(Dispatchers.IO) {
             val connection = URL(latestReleaseUrl).openConnection() as HttpURLConnection
             try {
@@ -22,9 +22,8 @@ class GitHubUpdateClient(
 
                 when (connection.responseCode) {
                     HttpURLConnection.HTTP_NOT_FOUND -> null
-                    HttpURLConnection.HTTP_OK -> parseUpdate(
-                        payload = connection.inputStream.bufferedReader().use { it.readText() },
-                        currentVersion = currentVersion,
+                    HttpURLConnection.HTTP_OK -> parseRelease(
+                        connection.inputStream.bufferedReader().use { it.readText() },
                     )
                     else -> error("GitHub update check failed with HTTP ${connection.responseCode}")
                 }
@@ -34,10 +33,14 @@ class GitHubUpdateClient(
         }
     }
 
-    private fun parseUpdate(payload: String, currentVersion: String): AppUpdate? {
+    suspend fun findUpdate(currentVersion: String): Result<AppUpdate?> =
+        latestRelease().map { release ->
+            release?.takeIf { VersionComparator.isNewer(it.versionName, currentVersion) }
+        }
+
+    private fun parseRelease(payload: String): AppUpdate? {
         val release = JSONObject(payload)
         val versionName = release.getString("tag_name").removePrefix("v")
-        if (!VersionComparator.isNewer(versionName, currentVersion)) return null
 
         val assets = release.getJSONArray("assets")
         val apkAsset = (0 until assets.length())
