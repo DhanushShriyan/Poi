@@ -16,6 +16,7 @@ local.properties
 keystore.properties
 admin.properties
 supabase.properties
+supabase/.temp/
 google-services.json
 service-account*.json
 
