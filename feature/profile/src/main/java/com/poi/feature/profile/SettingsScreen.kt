@@ -1,5 +1,10 @@
 package com.poi.feature.profile
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Today
@@ -37,11 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.poi.core.data.EventRepository
 import com.poi.core.designsystem.PoiSectionHeader
 import com.poi.core.designsystem.PoiSettingRow
+import com.poi.core.location.LocationRepository
 import com.poi.core.model.CheckInVisibility
 import kotlinx.coroutines.launch
 
@@ -49,6 +59,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     repository: EventRepository,
+    locationRepository: LocationRepository,
     deleteAccount: suspend () -> Result<Unit>,
     onBack: () -> Unit,
     onAccountDeleted: () -> Unit,
@@ -57,6 +68,7 @@ fun SettingsScreen(
     val settings by repository.settings.collectAsStateWithLifecycle()
     val profile by repository.profile.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var displayName by remember(profile.id, profile.displayName) { mutableStateOf(profile.displayName) }
     var handle by remember(profile.id, profile.handle) { mutableStateOf(profile.handle) }
     var homeArea by remember(profile.id, profile.homeArea) { mutableStateOf(profile.homeArea) }
@@ -65,6 +77,26 @@ fun SettingsScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteConfirmation by remember { mutableStateOf("") }
     var deletingAccount by remember { mutableStateOf(false) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        scope.launch {
+            repository.updateSettings(settings.copy(eventReminders = granted))
+        }
+    }
+    val setEventReminders: (Boolean) -> Unit = { enabled ->
+        if (!enabled) {
+            scope.launch { repository.updateSettings(settings.copy(eventReminders = false)) }
+        } else if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            scope.launch { repository.updateSettings(settings.copy(eventReminders = true)) }
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -200,17 +232,53 @@ fun SettingsScreen(
                     },
                 )
                 Spacer(Modifier.height(18.dp))
+                PoiSectionHeader("Location privacy")
+                PoiSettingRow(
+                    icon = Icons.Default.LocationOn,
+                    title = "Use current location for discovery",
+                    supporting = "Calculate distance on your device while Poi is open",
+                    trailing = {
+                        Switch(
+                            checked = settings.locationDiscoveryEnabled,
+                            onCheckedChange = { value ->
+                                if (!value) locationRepository.clear()
+                                scope.launch {
+                                    repository.updateSettings(settings.copy(locationDiscoveryEnabled = value))
+                                }
+                            },
+                        )
+                    },
+                )
+                PoiSettingRow(
+                    icon = Icons.Default.MyLocation,
+                    title = "Proximity-assisted check-in",
+                    supporting = "Confirm that you are near the venue without retaining raw location",
+                    trailing = {
+                        Switch(
+                            checked = settings.proximityCheckInEnabled,
+                            onCheckedChange = { value ->
+                                scope.launch {
+                                    repository.updateSettings(settings.copy(proximityCheckInEnabled = value))
+                                }
+                            },
+                        )
+                    },
+                )
+                Text(
+                    "Poi requests foreground location only. It does not track you in the background.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(18.dp))
                 PoiSectionHeader("Notifications")
                 PoiSettingRow(
                     icon = Icons.Default.Notifications,
                     title = "Event reminders",
-                    supporting = "Important start and change alerts",
+                    supporting = "One private device alert about an hour before saved events",
                     trailing = {
                         Switch(
                             checked = settings.eventReminders,
-                            onCheckedChange = { value ->
-                                scope.launch { repository.updateSettings(settings.copy(eventReminders = value)) }
-                            },
+                            onCheckedChange = setEventReminders,
                         )
                     },
                 )

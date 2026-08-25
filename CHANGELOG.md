@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4 location + social release — 2026-08-26
+
+- Added foreground-only location discovery with real on-device distance calculation and user-selected radius filtering.
+- Added privacy-safe proximity check-in: raw coordinates are cleared by the database trigger and only the verification result, distance, and accuracy are retained.
+- Added venue coordinates and organizer-selected check-in areas to event creation, with a manual fallback for events without a venue point.
+- Added a realtime People area with limited public profiles, friend requests, accepted friendships, friend removal, event invitations, and invitation acceptance.
+- Added privacy-aware friend activity and server-enforced controls for sharing future plans and check-ins.
+- Added personalized discovery using saved categories and opted-in friend activity.
+- Added opt-in, device-local event reminders that survive a phone restart and require no paid messaging service.
+- Kept social, location, notification, and feature UI code isolated behind dedicated modules and repository contracts.
+
 ## 0.2 connected foundation — 2026-08-25
 
 - Connected email accounts, profiles, events, attendance, reports, and event moments to Supabase.

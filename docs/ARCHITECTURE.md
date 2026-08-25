@@ -10,7 +10,7 @@ Poi uses feature modules and a repository boundary so that a requested change ca
                                     │
              ┌──────────────┬───────┼─────────┬──────────────┐
              │              │       │         │              │
-        discover          plans   create    profile          │
+        discover          plans   create    profile        social
              └──────────────┴───────┴─────────┴──────────────┘
                                     │
              ┌────────────────┬─────┴─────────────┬────────────────┐
@@ -30,18 +30,24 @@ Poi uses feature modules and a repository boundary so that a requested change ca
 7. Update delivery lives in `core:update`; feature modules never depend on it.
 8. Identity and roles are exposed only through `core:auth`; `feature:admin` never owns credentials.
 9. Admin screens check the local role, while the future cloud API must independently authorize every privileged operation.
+10. Foreground location access lives only in `core:location`; features receive the repository contract.
+11. Friendships and invitations use `SocialRepository`, independent from event and moment persistence.
+12. Reminder scheduling lives in `core:notifications` and uses only event plans already stored on the device.
 
 These rules prevent a visual change in Create from affecting discovery logic, and prevent a backend migration from requiring screen rewrites.
 
 ## State ownership
 
 - Durable product state: `EventRepository`.
+- Friend, invitation, and activity state: `SocialRepository`.
+- Foreground location state: `LocationRepository`; raw positions remain in memory except transient check-in verification input.
+- Scheduled reminder state: `EventReminderScheduler`.
 - Identity and role state: `AuthRepository`.
 - Screen-only input such as search text and selected filters: the owning feature.
 - Navigation state: `app`.
 - Release discovery and installer handoff: `core:update`.
 - Local test persistence: `SharedPreferences` inside `LocalEventRepository`.
-- Future cloud persistence: a new repository implementation selected by `PoiApplication`.
+- Connected persistence: Supabase repository implementations selected by `PoiApplication`, with isolated local preview fallbacks.
 
 ## Identity and administration
 
@@ -49,7 +55,7 @@ These rules prevent a visual change in Create from affecting discovery logic, an
 
 ## Cloud migration boundary
 
-To add cloud sync, implement `EventRepository` in a new data source such as `SupabaseEventRepository`. Do not change the method signatures until the cloud schema has been reviewed. Switch the implementation in `PoiApplication`; feature screens remain unchanged.
+Cloud implementations stay behind `EventRepository`, `MomentRepository`, and `SocialRepository`. Schema migrations are additive and filename-ordered. Switching the implementation in `PoiApplication` does not require feature-screen rewrites.
 
 ## Testing strategy
 

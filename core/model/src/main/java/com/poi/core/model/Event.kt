@@ -81,6 +81,9 @@ data class Event(
     val createdByCurrentUser: Boolean = false,
     val isCancelled: Boolean = false,
     val updatedAtMillis: Long? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val checkInRadiusMeters: Int = 500,
 )
 
 data class NewEvent(
@@ -93,6 +96,9 @@ data class NewEvent(
     val address: String,
     val visibility: EventVisibility,
     val organizerName: String = "Community organizer",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val checkInRadiusMeters: Int = 500,
 )
 
 data class EventReport(
@@ -132,9 +138,11 @@ data class AppSettings(
     val discoveryRadiusKm: Int? = 25,
     val defaultCheckInVisibility: CheckInVisibility = CheckInVisibility.FRIENDS,
     val showPlansToFriends: Boolean = true,
-    val eventReminders: Boolean = true,
+    val eventReminders: Boolean = false,
     val weeklyDigest: Boolean = true,
     val friendActivity: Boolean = true,
+    val locationDiscoveryEnabled: Boolean = false,
+    val proximityCheckInEnabled: Boolean = true,
 )
 
 fun Event.isLive(nowMillis: Long): Boolean = nowMillis in startsAtMillis..endsAtMillis

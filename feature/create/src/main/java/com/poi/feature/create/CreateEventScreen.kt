@@ -1,5 +1,9 @@
 package com.poi.feature.create
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +24,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -28,6 +33,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,10 +44,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.poi.core.data.EventRepository
 import com.poi.core.designsystem.PoiSectionHeader
+import com.poi.core.location.LocationRepository
 import com.poi.core.model.EventCategory
 import com.poi.core.model.EventVisibility
 import com.poi.core.model.NewEvent
@@ -54,6 +64,7 @@ private data class DateChoice(val label: String, val dayOffset: Int)
 fun CreateEventScreen(
     repository: EventRepository,
     organizerName: String,
+    locationRepository: LocationRepository,
     onCreated: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -68,7 +79,39 @@ fun CreateEventScreen(
     var accepted by remember { mutableStateOf(false) }
     var showErrors by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var attachCoordinates by remember { mutableStateOf(false) }
+    var checkInRadiusMeters by remember { mutableStateOf(500) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val locationState by locationRepository.state.collectAsStateWithLifecycle()
+    val hasLocationPermission = {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+    val loadVenueLocation: () -> Unit = {
+        scope.launch {
+            locationRepository.refresh().onSuccess { attachCoordinates = true }
+        }
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (grants.values.any { it }) loadVenueLocation()
+    }
+    val chooseVenueLocation: () -> Unit = {
+        if (hasLocationPermission()) {
+            loadVenueLocation()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
+    }
     val valid = title.isNotBlank() && summary.isNotBlank() && venue.isNotBlank() && address.isNotBlank() && accepted
 
     LazyColumn(
@@ -94,9 +137,9 @@ fun CreateEventScreen(
                     Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.padding(6.dp))
                     Column {
-                        Text("Poster scanner ready for cloud setup", style = MaterialTheme.typography.titleMedium)
+                        Text("Smart event creation", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "For this offline APK, enter event details below.",
+                            "Enter the essentials now. Poster scanning arrives in a later release.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -182,6 +225,48 @@ fun CreateEventScreen(
                 singleLine = true,
                 isError = showErrors && address.isBlank(),
             )
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = chooseVenueLocation,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !locationState.isLoading,
+            ) {
+                Icon(Icons.Default.MyLocation, null)
+                Spacer(Modifier.padding(4.dp))
+                Text(
+                    when {
+                        locationState.isLoading -> "Finding venue location…"
+                        attachCoordinates -> "Venue location attached"
+                        else -> "Use my current location for this venue"
+                    },
+                )
+            }
+            Text(
+                when {
+                    attachCoordinates -> "Only the venue point is published. Your live device location is not retained."
+                    locationState.errorMessage != null -> locationState.errorMessage.orEmpty()
+                    else -> "Adding a venue point enables accurate distance and proximity check-in."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (locationState.errorMessage != null && !attachCoordinates) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            if (attachCoordinates) {
+                Spacer(Modifier.height(10.dp))
+                Text("Check-in area", style = MaterialTheme.typography.titleMedium)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf(250, 500, 1_000, 2_500)) { radius ->
+                        FilterChip(
+                            selected = checkInRadiusMeters == radius,
+                            onClick = { checkInRadiusMeters = radius },
+                            label = { Text(if (radius < 1_000) "$radius m" else "${radius / 1_000.0} km") },
+                        )
+                    }
+                }
+            }
         }
 
         item {
@@ -245,6 +330,9 @@ fun CreateEventScreen(
                                 address = address,
                                 visibility = visibility,
                                 organizerName = organizerName,
+                                latitude = locationState.snapshot?.point?.latitude.takeIf { attachCoordinates },
+                                longitude = locationState.snapshot?.point?.longitude.takeIf { attachCoordinates },
+                                checkInRadiusMeters = checkInRadiusMeters,
                             ),
                         )
                         saving = false

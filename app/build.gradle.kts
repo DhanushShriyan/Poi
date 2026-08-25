@@ -55,8 +55,8 @@ val hasReleaseSigning = listOf(
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
 
-val poiVersionCode = providers.environmentVariable("POI_VERSION_CODE").orNull?.toIntOrNull() ?: 1
-val poiVersionName = providers.environmentVariable("POI_VERSION_NAME").orNull ?: "0.1.0"
+val poiVersionCode = providers.environmentVariable("POI_VERSION_CODE").orNull?.toIntOrNull() ?: 4000
+val poiVersionName = providers.environmentVariable("POI_VERSION_NAME").orNull ?: "0.4.0"
 val adminEmail = adminValue("POI_ADMIN_EMAIL", "email")
 val adminCodeSha256 = adminValue("POI_ADMIN_CODE_SHA256", "codeSha256")
 val supabaseUrl = cloudValue("POI_SUPABASE_URL", "url")
@@ -150,11 +150,14 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:auth"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:location"))
+    implementation(project(":core:notifications"))
     implementation(project(":core:update"))
     implementation(project(":feature:discover"))
     implementation(project(":feature:plans"))
     implementation(project(":feature:create"))
     implementation(project(":feature:profile"))
+    implementation(project(":feature:social"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:admin"))
 

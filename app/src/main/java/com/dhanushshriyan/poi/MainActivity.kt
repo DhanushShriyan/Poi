@@ -10,10 +10,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +25,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -40,8 +43,11 @@ import androidx.navigation.navArgument
 import com.poi.core.auth.AuthRepository
 import com.poi.core.data.EventRepository
 import com.poi.core.data.MomentRepository
+import com.poi.core.data.SocialRepository
 import com.poi.core.designsystem.PoiTheme
+import com.poi.core.location.LocationRepository
 import com.poi.core.model.ThemeMode
+import com.poi.core.notifications.EventReminderScheduler
 import com.poi.feature.admin.AdminDashboardScreen
 import com.poi.feature.admin.AdminEventEditorScreen
 import com.poi.feature.auth.AdminAccessScreen
@@ -55,6 +61,7 @@ import com.poi.feature.plans.PlansScreen
 import com.poi.feature.profile.ProfileScreen
 import com.poi.feature.profile.SafetyScreen
 import com.poi.feature.profile.SettingsScreen
+import com.poi.feature.social.SocialScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -70,6 +77,9 @@ class MainActivity : ComponentActivity() {
                     application.eventRepository,
                     application.authRepository,
                     application.momentRepository,
+                    application.locationRepository,
+                    application.socialRepository,
+                    application.reminderScheduler,
                 )
                 PoiUpdatePrompt()
             }
@@ -87,6 +97,7 @@ private object Routes {
     const val Discover = "discover"
     const val Plans = "plans"
     const val Create = "create"
+    const val People = "people"
     const val Profile = "profile"
     const val Event = "event/{eventId}"
     const val Settings = "settings"
@@ -112,6 +123,7 @@ private val topDestinations = listOf(
     TopDestination(Routes.Discover, "Discover", Icons.Default.Explore, Icons.Outlined.Explore),
     TopDestination(Routes.Plans, "Plans", Icons.Default.CalendarMonth, Icons.Outlined.CalendarMonth),
     TopDestination(Routes.Create, "Create", Icons.Default.AddCircle, Icons.Outlined.AddCircleOutline),
+    TopDestination(Routes.People, "People", Icons.Default.Groups, Icons.Outlined.Groups),
     TopDestination(Routes.Profile, "Profile", Icons.Default.Person, Icons.Outlined.Person),
 )
 
@@ -121,6 +133,9 @@ private fun PoiApp(
     repository: EventRepository,
     authRepository: AuthRepository,
     momentRepository: MomentRepository,
+    locationRepository: LocationRepository,
+    socialRepository: SocialRepository,
+    reminderScheduler: EventReminderScheduler,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -129,12 +144,18 @@ private fun PoiApp(
     val session by authRepository.session.collectAsStateWithLifecycle()
     val settings by repository.settings.collectAsStateWithLifecycle()
     val profile by repository.profile.collectAsStateWithLifecycle()
+    val events by repository.events.collectAsStateWithLifecycle()
+    val attendance by repository.attendance.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val signIn = { navController.navigate(Routes.SignIn) }
     val setDarkMode: (Boolean) -> Unit = { dark ->
         scope.launch {
             repository.updateSettings(settings.copy(themeMode = if (dark) ThemeMode.DARK else ThemeMode.LIGHT))
         }
+    }
+
+    LaunchedEffect(events, attendance, settings.eventReminders) {
+        reminderScheduler.sync(events, attendance, settings.eventReminders)
     }
 
     Scaffold(
@@ -151,6 +172,8 @@ private fun PoiApp(
                     repository = repository,
                     isGuest = !session.isAuthenticated,
                     displayName = profile.displayName,
+                    locationRepository = locationRepository,
+                    socialRepository = socialRepository,
                     onSignIn = signIn,
                     onEventClick = { navController.navigate(Routes.event(it)) },
                 )
@@ -175,6 +198,7 @@ private fun PoiApp(
                     CreateEventScreen(
                         repository = repository,
                         organizerName = profile.displayName,
+                        locationRepository = locationRepository,
                         onCreated = { eventId -> navController.navigate(Routes.event(eventId)) },
                     )
                 } else {
@@ -223,6 +247,8 @@ private fun PoiApp(
                     eventId = entry.arguments?.getString("eventId").orEmpty(),
                     repository = repository,
                     momentRepository = momentRepository,
+                    locationRepository = locationRepository,
+                    socialRepository = socialRepository,
                     isAuthenticated = session.isAuthenticated,
                     onSignIn = signIn,
                     onBack = { navController.popBackStack() },
@@ -285,9 +311,27 @@ private fun PoiApp(
                 if (session.isAuthenticated) {
                     SettingsScreen(
                         repository = repository,
+                        locationRepository = locationRepository,
                         deleteAccount = authRepository::deleteAccount,
                         onBack = { navController.popBackStack() },
                         onAccountDeleted = { navController.navigateTopLevel(Routes.Profile) },
+                    )
+                }
+            }
+            composable(Routes.People) {
+                val user = session.user
+                if (user != null) {
+                    SocialScreen(
+                        socialRepository = socialRepository,
+                        eventRepository = repository,
+                        currentUserId = user.id,
+                        onEventClick = { navController.navigate(Routes.event(it)) },
+                    )
+                } else {
+                    GuestGateScreen(
+                        title = "Events are better together",
+                        message = "Sign in to connect with friends, share plans, and manage private invitations.",
+                        onSignIn = signIn,
                     )
                 }
             }

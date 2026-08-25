@@ -9,6 +9,8 @@ Poi is a privacy-first, hyperlocal event discovery and friend-planning Android a
 - Create and use real email accounts, with Google OAuth and phone OTP gated until their providers are configured.
 - See live, upcoming, verified, private, and community-submitted event states.
 - Mark events as interested, going, or checked in.
+- Calculate real distance on-device with a user-selected discovery radius and no background location tracking.
+- Verify eligible check-ins by proximity while retaining only the verification result, not raw device coordinates.
 - Keep check-in visibility private, friends-only, or event-visible.
 - Create public, circle, or invitation-only events and sync them across devices.
 - View personal plans and profile statistics.
@@ -17,10 +19,12 @@ Poi is a privacy-first, hyperlocal event discovery and friend-planning Android a
 - Report events and hide reported content, with protected administrator moderation.
 - Edit a synced profile, monitor cloud connection health, retry failed loads, and permanently delete an account.
 - Configure privacy and notification preferences.
+- Find friends, manage requests, invite accepted friends, and follow privacy-aware live activity.
+- See personalized event picks and opt into local one-hour event reminders.
 - Detect, download, and hand off signed updates from GitHub Releases.
 - Use a role-protected administrator console to review reports and edit, cancel, feature, verify, restore, or delete any event.
 
-Release builds use Supabase for accounts, profiles, events, attendance, reports, event moments, and realtime refresh. Debug builds use the same connected path when `supabase.properties` is configured, otherwise they fall back to isolated local preview data.
+Release builds use Supabase for accounts, profiles, events, attendance, reports, event moments, friendships, invitations, activity, and realtime refresh. Debug builds use the same connected path when `supabase.properties` is configured, otherwise they fall back to isolated local preview data.
 
 Google sign-in becomes real when its Supabase provider and build flag are enabled. Phone OTP stays off until an SMS provider and abuse controls are configured because SMS is not reliably free. See [docs/ADMIN_ACCESS.md](docs/ADMIN_ACCESS.md) for restricted access and the production security boundary.
 
@@ -33,11 +37,14 @@ Google sign-in becomes real when its Supabase provider and build flag are enable
 | `core:data` | Repository contracts plus Supabase and local-preview implementations |
 | `core:auth` | Supabase authentication, preview identity, account deletion, and admin policy |
 | `core:designsystem` | Theme and shared UI components |
+| `core:location` | Foreground location access and in-memory location state |
+| `core:notifications` | Private device-local event reminder scheduling |
 | `core:update` | Release checking, APK download, and installer handoff |
 | `feature:discover` | Discovery feed and event details |
 | `feature:plans` | Saved and upcoming plans |
 | `feature:create` | Event creation flow |
 | `feature:profile` | Profile, privacy, and safety settings |
+| `feature:social` | Friend search, requests, invitations, and activity |
 | `feature:auth` | Guest, member sign-in, and restricted access screens |
 | `feature:admin` | Moderation dashboard and full event editor |
 

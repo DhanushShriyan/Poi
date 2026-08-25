@@ -4,7 +4,10 @@ import android.content.Context
 import com.poi.core.auth.AuthRepository
 import com.poi.core.cloud.PoiCloudClient
 import com.poi.core.model.AppSettings
+import com.poi.core.model.AttendanceEvidence
 import com.poi.core.model.AttendanceStatus
+import com.poi.core.model.AttendanceVerification
+import com.poi.core.model.AttendanceVerificationMethod
 import com.poi.core.model.CheckInVisibility
 import com.poi.core.model.Event
 import com.poi.core.model.EventCategory
@@ -55,6 +58,10 @@ class SupabaseEventRepository(
     private val _attendance = MutableStateFlow<Map<String, AttendanceStatus>>(emptyMap())
     override val attendance: StateFlow<Map<String, AttendanceStatus>> = _attendance.asStateFlow()
 
+    private val _attendanceVerification = MutableStateFlow<Map<String, AttendanceVerification>>(emptyMap())
+    override val attendanceVerification: StateFlow<Map<String, AttendanceVerification>> =
+        _attendanceVerification.asStateFlow()
+
     private val _checkInVisibility = MutableStateFlow<Map<String, CheckInVisibility>>(emptyMap())
     override val checkInVisibility: StateFlow<Map<String, CheckInVisibility>> =
         _checkInVisibility.asStateFlow()
@@ -91,6 +98,7 @@ class SupabaseEventRepository(
             authRepository.session.collectLatest { session ->
                 if (!session.isAuthenticated) {
                     _attendance.value = emptyMap()
+                    _attendanceVerification.value = emptyMap()
                     _checkInVisibility.value = emptyMap()
                     reportedIds.clear()
                     _reportedEvents.value = emptyList()
@@ -109,6 +117,7 @@ class SupabaseEventRepository(
         val userId = authRepository.session.value.user?.id
         if (userId == null) {
             _attendance.value = emptyMap()
+            _attendanceVerification.value = emptyMap()
             _checkInVisibility.value = emptyMap()
             reportedIds.clear()
             _reportedEvents.value = emptyList()
@@ -123,6 +132,7 @@ class SupabaseEventRepository(
         eventId: String,
         status: AttendanceStatus,
         visibility: CheckInVisibility?,
+        evidence: AttendanceEvidence?,
     ) = connectedOperation {
         val userId = requireUserId()
         if (status == AttendanceStatus.NONE) {
@@ -133,6 +143,7 @@ class SupabaseEventRepository(
                 }
             }
             _attendance.value = _attendance.value - eventId
+            _attendanceVerification.value = _attendanceVerification.value - eventId
             _checkInVisibility.value = _checkInVisibility.value - eventId
         } else {
             val resolvedVisibility = visibility
@@ -144,12 +155,16 @@ class SupabaseEventRepository(
                     eventId = eventId,
                     status = status.name.lowercase(),
                     visibility = resolvedVisibility.name.lowercase(),
+                    checkInLatitude = evidence?.latitude,
+                    checkInLongitude = evidence?.longitude,
+                    accuracyMeters = evidence?.accuracyMeters?.toInt(),
                 ),
             ) {
                 onConflict = "user_id,event_id"
             }
             _attendance.value = _attendance.value + (eventId to status)
             _checkInVisibility.value = _checkInVisibility.value + (eventId to resolvedVisibility)
+            refreshAttendance(userId)
         }
         refreshProfileCounts()
     }
@@ -169,6 +184,9 @@ class SupabaseEventRepository(
                 organizerName = newEvent.organizerName.trim(),
                 visibility = newEvent.visibility.name.lowercase(),
                 themeKey = themeFor(newEvent.category),
+                latitude = newEvent.latitude,
+                longitude = newEvent.longitude,
+                checkInRadiusMeters = newEvent.checkInRadiusMeters,
             ),
         ) { select() }
             .decodeSingle<EventRow>()
@@ -234,6 +252,17 @@ class SupabaseEventRepository(
 
     override suspend fun updateSettings(settings: AppSettings) {
         localPreferences.updateSettings(settings)
+        val userId = authRepository.session.value.user?.id ?: return
+        connectedOperation {
+            cloud.supabase.from("profiles").update(
+                ProfilePrivacyUpdateRow(
+                    sharePlansToFriends = settings.showPlansToFriends,
+                    shareFriendActivity = settings.friendActivity,
+                ),
+            ) {
+                filter { eq("id", userId) }
+            }
+        }
     }
 
     private suspend fun refreshMemberData(userId: String) {
@@ -252,6 +281,20 @@ class SupabaseEventRepository(
         }.toMap()
         _checkInVisibility.value = rows.mapNotNull { row ->
             enumValueOrNull<CheckInVisibility>(row.visibility.uppercase())?.let { row.eventId to it }
+        }.toMap()
+        _attendanceVerification.value = rows.mapNotNull { row ->
+            if (row.status !in setOf("here", "attended")) return@mapNotNull null
+            val method = if (row.verificationMethod == "proximity") {
+                AttendanceVerificationMethod.PROXIMITY
+            } else {
+                AttendanceVerificationMethod.MANUAL
+            }
+            row.eventId to AttendanceVerification(
+                method = method,
+                distanceMeters = row.distanceMeters,
+                accuracyMeters = row.accuracyMeters,
+                verifiedAtMillis = row.verifiedAtMillis,
+            )
         }.toMap()
     }
 
@@ -276,6 +319,12 @@ class SupabaseEventRepository(
             attendedCount = 0,
             hostedCount = 0,
             contributionPoints = 0,
+        )
+        localPreferences.updateSettings(
+            settings.value.copy(
+                showPlansToFriends = row.sharePlansToFriends,
+                friendActivity = row.shareFriendActivity,
+            ),
         )
         refreshProfileCounts()
     }
@@ -358,6 +407,9 @@ private data class EventRow(
     val featured: Boolean = false,
     @SerialName("is_cancelled") val isCancelled: Boolean = false,
     @SerialName("updated_at_millis") val updatedAtMillis: Long? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("check_in_radius_meters") val checkInRadiusMeters: Int = 500,
 )
 
 @Serializable
@@ -373,6 +425,9 @@ private data class NewEventRow(
     @SerialName("organizer_name") val organizerName: String,
     val visibility: String,
     @SerialName("theme_key") val themeKey: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("check_in_radius_meters") val checkInRadiusMeters: Int,
 )
 
 @Serializable
@@ -396,6 +451,9 @@ private data class EventUpdateRow(
     val featured: Boolean,
     @SerialName("is_cancelled") val isCancelled: Boolean,
     @SerialName("updated_at_millis") val updatedAtMillis: Long,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("check_in_radius_meters") val checkInRadiusMeters: Int,
 )
 
 @Serializable
@@ -404,6 +462,12 @@ private data class AttendanceRow(
     @SerialName("event_id") val eventId: String,
     val status: String,
     val visibility: String,
+    @SerialName("check_in_latitude") val checkInLatitude: Double? = null,
+    @SerialName("check_in_longitude") val checkInLongitude: Double? = null,
+    @SerialName("accuracy_meters") val accuracyMeters: Int? = null,
+    @SerialName("verification_method") val verificationMethod: String = "manual",
+    @SerialName("distance_meters") val distanceMeters: Int? = null,
+    @SerialName("verified_at_millis") val verifiedAtMillis: Long? = null,
 )
 
 @Serializable
@@ -420,6 +484,14 @@ private data class ProfileRow(
     @SerialName("display_name") val displayName: String,
     val handle: String? = null,
     @SerialName("home_area") val homeArea: String,
+    @SerialName("share_plans_to_friends") val sharePlansToFriends: Boolean = true,
+    @SerialName("share_friend_activity") val shareFriendActivity: Boolean = true,
+)
+
+@Serializable
+private data class ProfilePrivacyUpdateRow(
+    @SerialName("share_plans_to_friends") val sharePlansToFriends: Boolean,
+    @SerialName("share_friend_activity") val shareFriendActivity: Boolean,
 )
 
 @Serializable
@@ -469,6 +541,9 @@ private fun EventRow.toModel(currentUserId: String?): Event = Event(
     createdByCurrentUser = currentUserId != null && currentUserId == createdBy,
     isCancelled = isCancelled,
     updatedAtMillis = updatedAtMillis,
+    latitude = latitude,
+    longitude = longitude,
+    checkInRadiusMeters = checkInRadiusMeters,
 )
 
 private fun Event.toUpdateRow(): EventUpdateRow = EventUpdateRow(
@@ -491,6 +566,9 @@ private fun Event.toUpdateRow(): EventUpdateRow = EventUpdateRow(
     featured = featured,
     isCancelled = isCancelled,
     updatedAtMillis = System.currentTimeMillis(),
+    latitude = latitude,
+    longitude = longitude,
+    checkInRadiusMeters = checkInRadiusMeters,
 )
 
 private inline fun <reified T : Enum<T>> enumValueOrNull(value: String): T? =

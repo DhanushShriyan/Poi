@@ -1,7 +1,9 @@
 package com.poi.core.data
 
 import com.poi.core.model.AppSettings
+import com.poi.core.model.AttendanceEvidence
 import com.poi.core.model.AttendanceStatus
+import com.poi.core.model.AttendanceVerification
 import com.poi.core.model.CheckInVisibility
 import com.poi.core.model.Event
 import com.poi.core.model.EventCategory
@@ -23,6 +25,7 @@ interface EventRepository {
     val allEvents: StateFlow<List<Event>>
     val reportedEvents: StateFlow<List<EventReport>>
     val attendance: StateFlow<Map<String, AttendanceStatus>>
+    val attendanceVerification: StateFlow<Map<String, AttendanceVerification>>
     val checkInVisibility: StateFlow<Map<String, CheckInVisibility>>
     val settings: StateFlow<AppSettings>
     val profile: StateFlow<UserProfile>
@@ -34,6 +37,7 @@ interface EventRepository {
         eventId: String,
         status: AttendanceStatus,
         visibility: CheckInVisibility? = null,
+        evidence: AttendanceEvidence? = null,
     )
 
     suspend fun createEvent(newEvent: NewEvent): Event

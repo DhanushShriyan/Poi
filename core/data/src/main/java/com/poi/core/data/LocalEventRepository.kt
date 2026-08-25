@@ -2,7 +2,10 @@ package com.poi.core.data
 
 import android.content.Context
 import com.poi.core.model.AppSettings
+import com.poi.core.model.AttendanceEvidence
 import com.poi.core.model.AttendanceStatus
+import com.poi.core.model.AttendanceVerification
+import com.poi.core.model.AttendanceVerificationMethod
 import com.poi.core.model.CheckInVisibility
 import com.poi.core.model.Event
 import com.poi.core.model.EventCategory
@@ -10,9 +13,12 @@ import com.poi.core.model.EventReport
 import com.poi.core.model.EventVisibility
 import com.poi.core.model.NewEvent
 import com.poi.core.model.Organizer
+import com.poi.core.model.GeoPoint
+import com.poi.core.model.LocationSnapshot
 import com.poi.core.model.UserProfile
 import com.poi.core.model.VerificationLevel
 import com.poi.core.model.ThemeMode
+import com.poi.core.model.distanceMetersFrom
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +46,10 @@ class LocalEventRepository(context: Context) : EventRepository {
 
     private val _attendance = MutableStateFlow(loadAttendance())
     override val attendance: StateFlow<Map<String, AttendanceStatus>> = _attendance.asStateFlow()
+
+    private val _attendanceVerification = MutableStateFlow<Map<String, AttendanceVerification>>(emptyMap())
+    override val attendanceVerification: StateFlow<Map<String, AttendanceVerification>> =
+        _attendanceVerification.asStateFlow()
 
     private val _checkInVisibility = MutableStateFlow(loadCheckInVisibility())
     override val checkInVisibility: StateFlow<Map<String, CheckInVisibility>> =
@@ -77,6 +87,7 @@ class LocalEventRepository(context: Context) : EventRepository {
         eventId: String,
         status: AttendanceStatus,
         visibility: CheckInVisibility?,
+        evidence: AttendanceEvidence?,
     ) {
         _attendance.value = _attendance.value.toMutableMap().apply {
             if (status == AttendanceStatus.NONE) remove(eventId) else put(eventId, status)
@@ -84,6 +95,35 @@ class LocalEventRepository(context: Context) : EventRepository {
         if (visibility != null) {
             _checkInVisibility.value = _checkInVisibility.value.toMutableMap().apply {
                 put(eventId, visibility)
+            }
+        }
+        _attendanceVerification.value = _attendanceVerification.value.toMutableMap().apply {
+            when {
+                status == AttendanceStatus.HERE -> {
+                    val distance = evidence?.let { locationEvidence ->
+                        _allEvents.value.firstOrNull { it.id == eventId }?.distanceMetersFrom(
+                            LocationSnapshot(
+                                point = GeoPoint(locationEvidence.latitude, locationEvidence.longitude),
+                                accuracyMeters = locationEvidence.accuracyMeters,
+                                capturedAtMillis = System.currentTimeMillis(),
+                            ),
+                        )
+                    }
+                    put(
+                        eventId,
+                        AttendanceVerification(
+                            method = if (distance == null) {
+                                AttendanceVerificationMethod.MANUAL
+                            } else {
+                                AttendanceVerificationMethod.PROXIMITY
+                            },
+                            distanceMeters = distance?.toInt(),
+                            accuracyMeters = evidence?.accuracyMeters?.toInt(),
+                            verifiedAtMillis = System.currentTimeMillis(),
+                        ),
+                    )
+                }
+                else -> remove(eventId)
             }
         }
         persistAttendance()
@@ -109,6 +149,9 @@ class LocalEventRepository(context: Context) : EventRepository {
             friendNames = emptyList(),
             themeKey = themeFor(newEvent.category),
             createdByCurrentUser = true,
+            latitude = newEvent.latitude,
+            longitude = newEvent.longitude,
+            checkInRadiusMeters = newEvent.checkInRadiusMeters,
         )
         userEvents += event
         persistUserEvents()
@@ -200,6 +243,8 @@ class LocalEventRepository(context: Context) : EventRepository {
             .putBoolean(KEY_REMINDERS, settings.eventReminders)
             .putBoolean(KEY_DIGEST, settings.weeklyDigest)
             .putBoolean(KEY_FRIEND_ACTIVITY, settings.friendActivity)
+            .putBoolean(KEY_LOCATION_DISCOVERY, settings.locationDiscoveryEnabled)
+            .putBoolean(KEY_PROXIMITY_CHECK_IN, settings.proximityCheckInEnabled)
             .apply()
     }
 
@@ -269,9 +314,11 @@ class LocalEventRepository(context: Context) : EventRepository {
             )
         }.getOrDefault(CheckInVisibility.FRIENDS),
         showPlansToFriends = preferences.getBoolean(KEY_SHOW_PLANS, true),
-        eventReminders = preferences.getBoolean(KEY_REMINDERS, true),
+        eventReminders = preferences.getBoolean(KEY_REMINDERS, false),
         weeklyDigest = preferences.getBoolean(KEY_DIGEST, true),
         friendActivity = preferences.getBoolean(KEY_FRIEND_ACTIVITY, true),
+        locationDiscoveryEnabled = preferences.getBoolean(KEY_LOCATION_DISCOVERY, false),
+        proximityCheckInEnabled = preferences.getBoolean(KEY_PROXIMITY_CHECK_IN, true),
     )
 
     private fun persistUserEvents() {
@@ -329,6 +376,9 @@ class LocalEventRepository(context: Context) : EventRepository {
         put("featured", featured)
         put("createdByCurrentUser", createdByCurrentUser)
         put("cancelled", isCancelled)
+        latitude?.let { put("latitude", it) }
+        longitude?.let { put("longitude", it) }
+        put("checkInRadiusMeters", checkInRadiusMeters)
         updatedAtMillis?.let { put("updated", it) }
     }
 
@@ -363,6 +413,9 @@ class LocalEventRepository(context: Context) : EventRepository {
             createdByCurrentUser = optBoolean("createdByCurrentUser", createdByCurrentUserFallback),
             isCancelled = optBoolean("cancelled", false),
             updatedAtMillis = if (has("updated")) optLong("updated") else null,
+            latitude = if (has("latitude")) optDouble("latitude") else null,
+            longitude = if (has("longitude")) optDouble("longitude") else null,
+            checkInRadiusMeters = optInt("checkInRadiusMeters", 500),
         )
     }
 
@@ -384,6 +437,8 @@ class LocalEventRepository(context: Context) : EventRepository {
         private const val KEY_PROFILE_NAME = "profile_name"
         private const val KEY_PROFILE_HANDLE = "profile_handle"
         private const val KEY_PROFILE_HOME = "profile_home"
+        private const val KEY_LOCATION_DISCOVERY = "location_discovery"
+        private const val KEY_PROXIMITY_CHECK_IN = "proximity_check_in"
         private const val ANY_DISTANCE = -1
     }
 }
@@ -411,6 +466,9 @@ private fun createSeedEvents(): List<Event> {
             friendNames = listOf("Ananya", "Rohan", "Meera"),
             themeKey = "festival",
             featured = true,
+            latitude = 12.8867,
+            longitude = 74.8556,
+            checkInRadiusMeters = 1_200,
         ),
         Event(
             id = "coastal-concert",
@@ -429,6 +487,9 @@ private fun createSeedEvents(): List<Event> {
             attendeeCount = 216,
             friendNames = listOf("Arjun", "Nisha"),
             themeKey = "concert",
+            latitude = 12.9266,
+            longitude = 74.8137,
+            checkInRadiusMeters = 1_500,
         ),
         Event(
             id = "monsoon-sale",
@@ -447,6 +508,9 @@ private fun createSeedEvents(): List<Event> {
             attendeeCount = 94,
             friendNames = listOf("Meera"),
             themeKey = "sale",
+            latitude = 12.8718,
+            longitude = 74.8387,
+            checkInRadiusMeters = 600,
         ),
         Event(
             id = "beach-cleanup",
@@ -465,6 +529,9 @@ private fun createSeedEvents(): List<Event> {
             attendeeCount = 67,
             friendNames = listOf("Rohan", "Fatima"),
             themeKey = "community",
+            latitude = 12.9547,
+            longitude = 74.8009,
+            checkInRadiusMeters = 1_000,
         ),
         Event(
             id = "football-cup",
@@ -483,6 +550,9 @@ private fun createSeedEvents(): List<Event> {
             attendeeCount = 143,
             friendNames = emptyList(),
             themeKey = "sports",
+            latitude = 12.8690,
+            longitude = 74.8372,
+            checkInRadiusMeters = 800,
         ),
         Event(
             id = "pottery-workshop",
@@ -501,6 +571,9 @@ private fun createSeedEvents(): List<Event> {
             attendeeCount = 18,
             friendNames = listOf("Ananya"),
             themeKey = "workshop",
+            latitude = 12.8910,
+            longitude = 74.8422,
+            checkInRadiusMeters = 250,
         ),
         Event(
             id = "private-celebration",

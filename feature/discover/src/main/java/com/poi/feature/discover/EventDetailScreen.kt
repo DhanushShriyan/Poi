@@ -1,7 +1,11 @@
 package com.poi.feature.discover
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -56,18 +61,30 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import com.poi.core.data.EventRepository
 import com.poi.core.data.MomentRepository
+import com.poi.core.data.SocialRepository
 import com.poi.core.designsystem.PoiEventArtwork
 import com.poi.core.designsystem.PoiInitialAvatar
 import com.poi.core.designsystem.PoiSectionHeader
 import com.poi.core.designsystem.PoiStatusPill
 import com.poi.core.designsystem.formatEventDate
 import com.poi.core.designsystem.formatEventTime
+import com.poi.core.location.LocationRepository
+import com.poi.core.model.AttendanceEvidence
 import com.poi.core.model.AttendanceStatus
 import com.poi.core.model.CheckInVisibility
 import com.poi.core.model.Event
 import com.poi.core.model.EventVisibility
+import com.poi.core.model.FriendshipStatus
+import com.poi.core.model.InvitationStatus
+import com.poi.core.model.LocationSnapshot
+import com.poi.core.model.SocialProfile
+import com.poi.core.model.distanceMetersFrom
+import com.poi.core.model.geoPointOrNull
+import com.poi.core.model.isWithinCheckInRange
+import com.poi.core.model.withDistanceFrom
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,6 +93,8 @@ fun EventDetailScreen(
     eventId: String,
     repository: EventRepository,
     momentRepository: MomentRepository,
+    locationRepository: LocationRepository,
+    socialRepository: SocialRepository,
     isAuthenticated: Boolean,
     onSignIn: () -> Unit,
     onBack: () -> Unit,
@@ -83,13 +102,77 @@ fun EventDetailScreen(
 ) {
     val events by repository.events.collectAsStateWithLifecycle()
     val attendance by repository.attendance.collectAsStateWithLifecycle()
+    val attendanceVerification by repository.attendanceVerification.collectAsStateWithLifecycle()
     val settings by repository.settings.collectAsStateWithLifecycle()
-    val event = events.firstOrNull { it.id == eventId }
+    val locationState by locationRepository.state.collectAsStateWithLifecycle()
+    val friendships by socialRepository.friendships.collectAsStateWithLifecycle()
+    val invitations by socialRepository.invitations.collectAsStateWithLifecycle()
+    val event = events.firstOrNull { it.id == eventId }?.let { listedEvent ->
+        locationState.snapshot?.let(listedEvent::withDistanceFrom) ?: listedEvent
+    }
     val status = attendance[eventId] ?: AttendanceStatus.NONE
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var showCheckIn by remember { mutableStateOf(false) }
     var showReport by remember { mutableStateOf(false) }
+    var showInviteFriends by remember { mutableStateOf(false) }
+    var inviteMessage by remember { mutableStateOf<String?>(null) }
+    var checkInLocation by remember { mutableStateOf<LocationSnapshot?>(null) }
+    var checkInLocationMessage by remember { mutableStateOf<String?>(null) }
+    var checkInError by remember { mutableStateOf<String?>(null) }
+    val hasLocationPermission = {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+    val prepareCheckIn: () -> Unit = {
+        checkInError = null
+        val selectedEvent = event
+        if (selectedEvent == null || !settings.proximityCheckInEnabled || selectedEvent.geoPointOrNull() == null) {
+            checkInLocation = null
+            checkInLocationMessage = null
+            showCheckIn = true
+        } else {
+            scope.launch {
+                locationRepository.refresh().fold(
+                    onSuccess = { location ->
+                        checkInLocation = location
+                        checkInLocationMessage = null
+                    },
+                    onFailure = { error ->
+                        checkInLocation = null
+                        checkInLocationMessage = error.message
+                    },
+                )
+                showCheckIn = true
+            }
+        }
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (grants.values.any { it }) {
+            prepareCheckIn()
+        } else {
+            checkInLocation = null
+            checkInLocationMessage = "Location permission was not granted. This check-in will be marked manual."
+            showCheckIn = true
+        }
+    }
+    val requestCheckIn: () -> Unit = {
+        val needsLocation = settings.proximityCheckInEnabled && event?.geoPointOrNull() != null
+        if (needsLocation && !hasLocationPermission()) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        } else {
+            prepareCheckIn()
+        }
+    }
 
     if (event == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -164,10 +247,28 @@ fun EventDetailScreen(
                         "${formatEventTime(event.startsAtMillis)} – ${formatEventTime(event.endsAtMillis)}",
                     )
                     InfoRow(Icons.Default.LocationOn, event.venue, event.address)
+                    if (locationState.snapshot != null && event.geoPointOrNull() != null) {
+                        InfoRow(
+                            Icons.Default.MyLocation,
+                            "Distance from you",
+                            if (event.distanceKm < 1.0) {
+                                "${(event.distanceKm * 1_000).toInt()} m"
+                            } else {
+                                "%.1f km".format(event.distanceKm)
+                            },
+                        )
+                    }
 
                     OutlinedButton(
                         onClick = {
-                            val uri = Uri.parse("geo:0,0?q=${Uri.encode(event.address)}")
+                            val uri = if (event.latitude != null && event.longitude != null) {
+                                Uri.parse(
+                                    "geo:${event.latitude},${event.longitude}?q=" +
+                                        Uri.encode("${event.latitude},${event.longitude}(${event.venue})"),
+                                )
+                            } else {
+                                Uri.parse("geo:0,0?q=${Uri.encode(event.address)}")
+                            }
                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -232,12 +333,37 @@ fun EventDetailScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Button(
-                        onClick = { if (isAuthenticated) showCheckIn = true else onSignIn() },
+                        onClick = { if (isAuthenticated) requestCheckIn() else onSignIn() },
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !locationState.isLoading,
                     ) {
-                        Icon(Icons.Default.CheckCircle, null)
+                        Icon(
+                            if (event.geoPointOrNull() != null && settings.proximityCheckInEnabled) {
+                                Icons.Default.MyLocation
+                            } else {
+                                Icons.Default.CheckCircle
+                            },
+                            null,
+                        )
                         Spacer(Modifier.width(8.dp))
-                        Text(if (status == AttendanceStatus.HERE) "Checked in" else "I'm here")
+                        Text(
+                            when {
+                                locationState.isLoading -> "Confirming location…"
+                                status == AttendanceStatus.HERE -> "Checked in"
+                                else -> "I'm here"
+                            },
+                        )
+                    }
+                    attendanceVerification[event.id]?.let { verification ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            buildString {
+                                append(verification.method.label)
+                                verification.distanceMeters?.let { append(" · $it m from venue point") }
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
 
                     Spacer(Modifier.height(28.dp))
@@ -272,6 +398,18 @@ fun EventDetailScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (isAuthenticated && friendships.any { it.status == FriendshipStatus.ACCEPTED }) {
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                inviteMessage = null
+                                showInviteFriends = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Invite friends")
+                        }
+                    }
 
                     Spacer(Modifier.height(24.dp))
                     EventMomentsSection(
@@ -301,10 +439,26 @@ fun EventDetailScreen(
     if (showCheckIn) {
         CheckInDialog(
             initial = settings.defaultCheckInVisibility,
+            event = event,
+            location = checkInLocation,
+            locationMessage = checkInError ?: checkInLocationMessage,
+            proximityEnabled = settings.proximityCheckInEnabled,
             onDismiss = { showCheckIn = false },
-            onConfirm = { visibility ->
-                scope.launch { repository.setAttendance(event.id, AttendanceStatus.HERE, visibility) }
-                showCheckIn = false
+            onConfirm = { visibility, evidence ->
+                scope.launch {
+                    runCatching {
+                        repository.setAttendance(
+                            event.id,
+                            AttendanceStatus.HERE,
+                            visibility,
+                            evidence,
+                        )
+                    }.onSuccess {
+                        showCheckIn = false
+                    }.onFailure { error ->
+                        checkInError = error.message ?: "Check-in could not be completed."
+                    }
+                }
             },
         )
     }
@@ -316,6 +470,24 @@ fun EventDetailScreen(
                 scope.launch { repository.reportEvent(event.id, reason) }
                 showReport = false
                 onBack()
+            },
+        )
+    }
+
+    if (showInviteFriends) {
+        InviteFriendsDialog(
+            friends = friendships.filter { it.status == FriendshipStatus.ACCEPTED }.map { it.profile },
+            invitedProfileIds = invitations.filter {
+                it.eventId == event.id && it.status != InvitationStatus.DECLINED
+            }.mapTo(mutableSetOf()) { it.invitee.id },
+            message = inviteMessage,
+            onDismiss = { showInviteFriends = false },
+            onInvite = { profileId ->
+                scope.launch {
+                    runCatching { socialRepository.inviteToEvent(event.id, profileId) }
+                        .onSuccess { inviteMessage = "Invitation sent." }
+                        .onFailure { inviteMessage = it.message ?: "Invitation could not be sent." }
+                }
             },
         )
     }
@@ -380,18 +552,106 @@ private fun OrganizerCard(event: Event) {
 }
 
 @Composable
+private fun InviteFriendsDialog(
+    friends: List<SocialProfile>,
+    invitedProfileIds: Set<String>,
+    message: String?,
+    onDismiss: () -> Unit,
+    onInvite: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Invite friends") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Accepted friends can receive this invitation. Private venue details remain protected by event access rules.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                friends.forEach { friend ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PoiInitialAvatar(friend.displayName, Modifier.size(40.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(friend.displayName, style = MaterialTheme.typography.titleMedium)
+                            Text(friend.handle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Button(
+                            onClick = { onInvite(friend.id) },
+                            enabled = friend.id !in invitedProfileIds,
+                        ) {
+                            Text(if (friend.id in invitedProfileIds) "Sent" else "Invite")
+                        }
+                    }
+                }
+                message?.let {
+                    Text(
+                        it,
+                        color = if (it == "Invitation sent.") MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+@Composable
 private fun CheckInDialog(
     initial: CheckInVisibility,
+    event: Event,
+    location: LocationSnapshot?,
+    locationMessage: String?,
+    proximityEnabled: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (CheckInVisibility) -> Unit,
+    onConfirm: (CheckInVisibility, AttendanceEvidence?) -> Unit,
 ) {
     var selected by remember(initial) { mutableStateOf(initial) }
+    val venueHasCoordinates = event.geoPointOrNull() != null
+    val distanceMeters = location?.let(event::distanceMetersFrom)
+    val isNearby = location != null && event.isWithinCheckInRange(location)
+    val isOutsideRange = proximityEnabled && venueHasCoordinates && location != null && !isNearby
+    val evidence = if (isNearby) {
+        val nearbyLocation = checkNotNull(location)
+        AttendanceEvidence(
+            latitude = nearbyLocation.point.latitude,
+            longitude = nearbyLocation.point.longitude,
+            accuracyMeters = nearbyLocation.accuracyMeters,
+        )
+    } else {
+        null
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Who can see you're here?") },
         text = {
             Column {
-                Text("Your check-in expires automatically after the event.")
+                Text(
+                    when {
+                        locationMessage != null -> locationMessage
+                        isNearby -> "You are within the event's check-in area. Poi will store only the verification result."
+                        isOutsideRange -> "You appear to be outside this event's ${event.checkInRadiusMeters} m check-in area."
+                        !venueHasCoordinates -> "This event has no venue point, so the check-in will be marked manual."
+                        else -> "This check-in will be marked manual."
+                    },
+                    color = if (isOutsideRange) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                distanceMeters?.let { distance ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Current distance: ${distance.toInt()} m · accuracy ±${location.accuracyMeters.toInt()} m",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 CheckInVisibility.entries.forEach { option ->
                     Row(
@@ -414,7 +674,12 @@ private fun CheckInDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text("Check in") } },
+        confirmButton = {
+            TextButton(
+                enabled = !isOutsideRange,
+                onClick = { onConfirm(selected, evidence) },
+            ) { Text(if (isNearby) "Confirm nearby check-in" else "Check in manually") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

@@ -15,6 +15,8 @@ Run these migrations in filename order in the Supabase SQL editor:
 1. `supabase/migrations/202608190001_poi_core.sql`
 2. `supabase/migrations/202608210001_event_moments.sql`
 3. `supabase/migrations/202608250001_release_02_connected_foundation.sql`
+4. `supabase/migrations/202608260001_release_03_location_attendance.sql`
+5. `supabase/migrations/202608260002_release_04_social_retention.sql`
 
 Together they create:
 
@@ -28,6 +30,9 @@ Together they create:
 - server-authoritative attendance totals and realtime event, attendance, report, profile, and moment updates;
 - administrator-only audit history and a protected account-deletion function;
 - three starter events for the first connected test.
+- venue check-in areas with server-verified proximity and immediate raw-coordinate clearing;
+- a role-free public profile directory, friendships, private invitations, and event membership on acceptance;
+- privacy-aware social activity with realtime delivery and server-enforced sharing controls.
 
 The same migration can be deployed with the Supabase CLI after linking the project:
 
@@ -92,6 +97,8 @@ The admin entry remains hidden in Poi: sign out, open **Profile**, then press an
 - Never commit a service-role key, signing key, OAuth client secret, or SMS provider secret.
 - Admin status lives only in the protected `profiles.role` column; a hidden screen is not treated as authorization.
 - Row-level security remains enabled on every connected table.
+- The social directory intentionally excludes email, phone number, provider metadata, and administrator role.
+- Location is requested only while Poi is open; proximity check-in retains a distance result and clears raw coordinates before the attendance row is stored.
 - Public keys in an APK are expected; database policies are the security boundary.
 - Uploaded moment files are removed by the signed-in client before the protected account-deletion function removes the account data.
 - Revoke active sessions and review the audit log if an account or administrator credential is suspected to be compromised.

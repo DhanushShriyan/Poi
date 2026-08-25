@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.poi.feature.profile"
+    namespace = "com.poi.feature.social"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }
@@ -19,14 +19,12 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:data"))
     implementation(project(":core:designsystem"))
-    implementation(project(":core:location"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

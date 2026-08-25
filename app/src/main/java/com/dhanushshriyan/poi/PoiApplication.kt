@@ -10,9 +10,15 @@ import com.poi.core.cloud.PoiCloudConfig
 import com.poi.core.data.EventRepository
 import com.poi.core.data.LocalEventRepository
 import com.poi.core.data.LocalMomentRepository
+import com.poi.core.data.LocalSocialRepository
 import com.poi.core.data.MomentRepository
+import com.poi.core.data.SocialRepository
 import com.poi.core.data.SupabaseEventRepository
 import com.poi.core.data.SupabaseMomentRepository
+import com.poi.core.data.SupabaseSocialRepository
+import com.poi.core.location.AndroidLocationRepository
+import com.poi.core.location.LocationRepository
+import com.poi.core.notifications.EventReminderScheduler
 
 class PoiApplication : Application() {
     private val cloudClient: PoiCloudClient? by lazy {
@@ -47,5 +53,19 @@ class PoiApplication : Application() {
         cloudClient?.let { cloud ->
             SupabaseMomentRepository(cloud, authRepository)
         } ?: LocalMomentRepository()
+    }
+
+    val socialRepository: SocialRepository by lazy {
+        cloudClient?.let { cloud ->
+            SupabaseSocialRepository(cloud, authRepository)
+        } ?: LocalSocialRepository(authRepository)
+    }
+
+    val locationRepository: LocationRepository by lazy {
+        AndroidLocationRepository(applicationContext)
+    }
+
+    val reminderScheduler: EventReminderScheduler by lazy {
+        EventReminderScheduler(applicationContext)
     }
 }
