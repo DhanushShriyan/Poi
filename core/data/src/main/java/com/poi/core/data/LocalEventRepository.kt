@@ -48,12 +48,15 @@ class LocalEventRepository(context: Context) : EventRepository {
     private val _settings = MutableStateFlow(loadSettings())
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    private val _syncState = MutableStateFlow(DataSyncState(isCloudBacked = false))
+    override val syncState: StateFlow<DataSyncState> = _syncState.asStateFlow()
+
     private val _profile = MutableStateFlow(
         UserProfile(
             id = "local-user",
-            displayName = "Dhanush",
-            handle = "@dhanush",
-            homeArea = "Mangaluru",
+            displayName = preferences.getString(KEY_PROFILE_NAME, "Dhanush").orEmpty(),
+            handle = preferences.getString(KEY_PROFILE_HANDLE, "@dhanush").orEmpty(),
+            homeArea = preferences.getString(KEY_PROFILE_HOME, "Mangaluru").orEmpty(),
             attendedCount = 12,
             hostedCount = 3,
             contributionPoints = 240,
@@ -67,6 +70,8 @@ class LocalEventRepository(context: Context) : EventRepository {
         refreshEvents()
         refreshProfile()
     }
+
+    override suspend fun refresh() = Unit
 
     override suspend fun setAttendance(
         eventId: String,
@@ -162,6 +167,27 @@ class LocalEventRepository(context: Context) : EventRepository {
         persistAttendance()
         refreshEvents()
         refreshProfile()
+    }
+
+    override suspend fun updateProfile(displayName: String, handle: String, homeArea: String) {
+        val cleanName = displayName.trim()
+        val cleanHandle = handle.trim().removePrefix("@").lowercase()
+        val cleanHomeArea = homeArea.trim()
+        require(cleanName.length in 1..60) { "Enter a name between 1 and 60 characters." }
+        require(cleanHandle.matches(Regex("[a-z0-9_]{3,24}"))) {
+            "Handle must be 3–24 letters, numbers, or underscores."
+        }
+        require(cleanHomeArea.length in 1..100) { "Enter your city or home area." }
+        _profile.value = _profile.value.copy(
+            displayName = cleanName,
+            handle = "@$cleanHandle",
+            homeArea = cleanHomeArea,
+        )
+        preferences.edit()
+            .putString(KEY_PROFILE_NAME, cleanName)
+            .putString(KEY_PROFILE_HANDLE, "@$cleanHandle")
+            .putString(KEY_PROFILE_HOME, cleanHomeArea)
+            .apply()
     }
 
     override suspend fun updateSettings(settings: AppSettings) {
@@ -355,6 +381,9 @@ class LocalEventRepository(context: Context) : EventRepository {
         private const val KEY_REMINDERS = "reminders"
         private const val KEY_DIGEST = "weekly_digest"
         private const val KEY_FRIEND_ACTIVITY = "friend_activity"
+        private const val KEY_PROFILE_NAME = "profile_name"
+        private const val KEY_PROFILE_HANDLE = "profile_handle"
+        private const val KEY_PROFILE_HOME = "profile_home"
         private const val ANY_DISTANCE = -1
     }
 }

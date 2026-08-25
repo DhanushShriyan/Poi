@@ -10,6 +10,14 @@ import com.poi.core.model.NewEvent
 import com.poi.core.model.UserProfile
 import kotlinx.coroutines.flow.StateFlow
 
+data class DataSyncState(
+    val isCloudBacked: Boolean,
+    val isLoading: Boolean = false,
+    val isConnected: Boolean = false,
+    val errorMessage: String? = null,
+    val lastSyncedAtMillis: Long? = null,
+)
+
 interface EventRepository {
     val events: StateFlow<List<Event>>
     val allEvents: StateFlow<List<Event>>
@@ -18,6 +26,9 @@ interface EventRepository {
     val checkInVisibility: StateFlow<Map<String, CheckInVisibility>>
     val settings: StateFlow<AppSettings>
     val profile: StateFlow<UserProfile>
+    val syncState: StateFlow<DataSyncState>
+
+    suspend fun refresh()
 
     suspend fun setAttendance(
         eventId: String,
@@ -30,6 +41,7 @@ interface EventRepository {
     suspend fun restoreReportedEvent(eventId: String)
     suspend fun updateEvent(event: Event)
     suspend fun deleteEvent(eventId: String)
+    suspend fun updateProfile(displayName: String, handle: String, homeArea: String)
     suspend fun updateSettings(settings: AppSettings)
 }
 

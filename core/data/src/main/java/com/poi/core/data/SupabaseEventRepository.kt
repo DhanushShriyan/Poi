@@ -20,11 +20,14 @@ import io.github.jan.supabase.realtime.selectAsFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -57,16 +60,31 @@ class SupabaseEventRepository(
         _checkInVisibility.asStateFlow()
 
     override val settings: StateFlow<AppSettings> = localPreferences.settings
-    override val profile: StateFlow<UserProfile> = localPreferences.profile
+
+    private val _profile = MutableStateFlow(localPreferences.profile.value)
+    override val profile: StateFlow<UserProfile> = _profile.asStateFlow()
+
+    private val _syncState = MutableStateFlow(
+        DataSyncState(isCloudBacked = true, isLoading = true),
+    )
+    override val syncState: StateFlow<DataSyncState> = _syncState.asStateFlow()
 
     init {
         scope.launch {
             cloud.supabase.from("events")
                 .selectAsFlow(EventRow::id)
-                .catch { emit(emptyList()) }
+                .onStart { markLoading() }
+                .retryWhen { cause, attempt ->
+                    markFailure(cause)
+                    delay((attempt + 1).coerceAtMost(6) * 1_000L)
+                    true
+                }
+                .catch { error -> markFailure(error) }
                 .collectLatest { rows ->
                     eventRows.value = rows
                     refreshEvents()
+                    refreshProfileCounts()
+                    markSuccess()
                 }
         }
         scope.launch {
@@ -74,19 +92,38 @@ class SupabaseEventRepository(
                 if (!session.isAuthenticated) {
                     _attendance.value = emptyMap()
                     _checkInVisibility.value = emptyMap()
+                    reportedIds.clear()
+                    _reportedEvents.value = emptyList()
+                    _profile.value = localPreferences.profile.value
                 } else {
-                    refreshAttendance(session.user?.id)
+                    runCatching { refreshMemberData(checkNotNull(session.user?.id)) }
+                        .onFailure(::markFailure)
                 }
                 refreshEvents()
             }
         }
     }
 
+    override suspend fun refresh() = connectedOperation {
+        eventRows.value = cloud.supabase.from("events").select().decodeList<EventRow>()
+        val userId = authRepository.session.value.user?.id
+        if (userId == null) {
+            _attendance.value = emptyMap()
+            _checkInVisibility.value = emptyMap()
+            reportedIds.clear()
+            _reportedEvents.value = emptyList()
+        } else {
+            refreshMemberData(userId)
+        }
+        refreshEvents()
+        refreshProfileCounts()
+    }
+
     override suspend fun setAttendance(
         eventId: String,
         status: AttendanceStatus,
         visibility: CheckInVisibility?,
-    ) {
+    ) = connectedOperation {
         val userId = requireUserId()
         if (status == AttendanceStatus.NONE) {
             cloud.supabase.from("attendance").delete {
@@ -114,11 +151,12 @@ class SupabaseEventRepository(
             _attendance.value = _attendance.value + (eventId to status)
             _checkInVisibility.value = _checkInVisibility.value + (eventId to resolvedVisibility)
         }
+        refreshProfileCounts()
     }
 
-    override suspend fun createEvent(newEvent: NewEvent): Event {
+    override suspend fun createEvent(newEvent: NewEvent): Event = connectedOperation {
         requireUserId()
-        return cloud.supabase.from("events").insert(
+        cloud.supabase.from("events").insert(
             NewEventRow(
                 title = newEvent.title.trim(),
                 summary = newEvent.summary.trim(),
@@ -137,7 +175,7 @@ class SupabaseEventRepository(
             .toModel(authRepository.session.value.user?.id)
     }
 
-    override suspend fun reportEvent(eventId: String, reason: String) {
+    override suspend fun reportEvent(eventId: String, reason: String) = connectedOperation {
         val report = EventReport(
             eventId = eventId,
             reason = reason.trim(),
@@ -157,12 +195,12 @@ class SupabaseEventRepository(
         refreshEvents()
     }
 
-    override suspend fun restoreReportedEvent(eventId: String) {
+    override suspend fun restoreReportedEvent(eventId: String) = connectedOperation {
         val userId = requireUserId()
         cloud.supabase.from("reports").delete {
             filter {
-                eq("reporter_id", userId)
                 eq("event_id", eventId)
+                if (!authRepository.session.value.isAdmin) eq("reporter_id", userId)
             }
         }
         reportedIds -= eventId
@@ -170,35 +208,86 @@ class SupabaseEventRepository(
         refreshEvents()
     }
 
-    override suspend fun updateEvent(event: Event) {
+    override suspend fun updateEvent(event: Event) = connectedOperation {
         cloud.supabase.from("events").update(event.toUpdateRow()) {
             filter { eq("id", event.id) }
         }
+        Unit
     }
 
-    override suspend fun deleteEvent(eventId: String) {
+    override suspend fun deleteEvent(eventId: String) = connectedOperation {
         cloud.supabase.from("events").delete {
             filter { eq("id", eventId) }
         }
+        Unit
     }
+
+    override suspend fun updateProfile(displayName: String, handle: String, homeArea: String) =
+        connectedOperation {
+            val update = normalizeProfileUpdate(displayName, handle, homeArea)
+            val userId = requireUserId()
+            cloud.supabase.from("profiles").update(update) {
+                filter { eq("id", userId) }
+            }
+            refreshProfile(userId)
+        }
 
     override suspend fun updateSettings(settings: AppSettings) {
         localPreferences.updateSettings(settings)
     }
 
+    private suspend fun refreshMemberData(userId: String) {
+        refreshAttendance(userId)
+        refreshReports()
+        refreshProfile(userId)
+    }
+
     private suspend fun refreshAttendance(userId: String?) {
         if (userId == null) return
-        val rows = runCatching {
-            cloud.supabase.from("attendance").select {
-                filter { eq("user_id", userId) }
-            }.decodeList<AttendanceRow>()
-        }.getOrDefault(emptyList())
+        val rows = cloud.supabase.from("attendance").select {
+            filter { eq("user_id", userId) }
+        }.decodeList<AttendanceRow>()
         _attendance.value = rows.mapNotNull { row ->
             enumValueOrNull<AttendanceStatus>(row.status.uppercase())?.let { row.eventId to it }
         }.toMap()
         _checkInVisibility.value = rows.mapNotNull { row ->
             enumValueOrNull<CheckInVisibility>(row.visibility.uppercase())?.let { row.eventId to it }
         }.toMap()
+    }
+
+    private suspend fun refreshReports() {
+        val rows = cloud.supabase.from("reports").select().decodeList<ReportRow>()
+        reportedIds.clear()
+        reportedIds += rows.map(ReportRow::eventId)
+        _reportedEvents.value = rows.map { row ->
+            EventReport(row.eventId, row.reason, row.reportedAtMillis)
+        }.sortedByDescending(EventReport::reportedAtMillis)
+    }
+
+    private suspend fun refreshProfile(userId: String) {
+        val row = cloud.supabase.from("profiles").select {
+            filter { eq("id", userId) }
+        }.decodeSingle<ProfileRow>()
+        _profile.value = UserProfile(
+            id = row.id,
+            displayName = row.displayName,
+            handle = row.handle ?: defaultHandle(row.id),
+            homeArea = row.homeArea,
+            attendedCount = 0,
+            hostedCount = 0,
+            contributionPoints = 0,
+        )
+        refreshProfileCounts()
+    }
+
+    private fun refreshProfileCounts() {
+        val userId = authRepository.session.value.user?.id ?: return
+        _profile.value = _profile.value.copy(
+            attendedCount = _attendance.value.values.count {
+                it == AttendanceStatus.HERE || it == AttendanceStatus.ATTENDED
+            },
+            hostedCount = eventRows.value.count { it.createdBy == userId },
+        )
     }
 
     private fun refreshEvents() {
@@ -213,6 +302,37 @@ class SupabaseEventRepository(
 
     private fun requireUserId(): String =
         requireNotNull(authRepository.session.value.user?.id) { "Sign in to continue." }
+
+    private suspend fun <T> connectedOperation(block: suspend () -> T): T {
+        markLoading()
+        return try {
+            block().also { markSuccess() }
+        } catch (error: Throwable) {
+            markFailure(error)
+            throw error
+        }
+    }
+
+    private fun markLoading() {
+        _syncState.value = _syncState.value.copy(isLoading = true, errorMessage = null)
+    }
+
+    private fun markSuccess() {
+        _syncState.value = DataSyncState(
+            isCloudBacked = true,
+            isConnected = true,
+            lastSyncedAtMillis = System.currentTimeMillis(),
+        )
+    }
+
+    private fun markFailure(error: Throwable) {
+        _syncState.value = _syncState.value.copy(
+            isLoading = false,
+            isConnected = false,
+            errorMessage = error.message?.takeIf(String::isNotBlank)
+                ?: "Poi could not reach the service. Check your connection and retry.",
+        )
+    }
 }
 
 @Serializable
@@ -293,6 +413,39 @@ private data class ReportRow(
     val reason: String,
     @SerialName("reported_at_millis") val reportedAtMillis: Long,
 )
+
+@Serializable
+private data class ProfileRow(
+    val id: String,
+    @SerialName("display_name") val displayName: String,
+    val handle: String? = null,
+    @SerialName("home_area") val homeArea: String,
+)
+
+@Serializable
+internal data class ProfileUpdateRow(
+    @SerialName("display_name") val displayName: String,
+    val handle: String,
+    @SerialName("home_area") val homeArea: String,
+)
+
+internal fun normalizeProfileUpdate(
+    displayName: String,
+    handle: String,
+    homeArea: String,
+): ProfileUpdateRow {
+    val cleanName = displayName.trim()
+    val cleanHandle = handle.trim().removePrefix("@").lowercase()
+    val cleanHomeArea = homeArea.trim()
+    require(cleanName.length in 1..60) { "Enter a name between 1 and 60 characters." }
+    require(cleanHandle.matches(Regex("[a-z0-9_]{3,24}"))) {
+        "Handle must be 3–24 letters, numbers, or underscores."
+    }
+    require(cleanHomeArea.length in 1..100) { "Enter your city or home area." }
+    return ProfileUpdateRow(cleanName, "@$cleanHandle", cleanHomeArea)
+}
+
+private fun defaultHandle(userId: String): String = "@${userId.replace("-", "").take(12)}"
 
 private fun EventRow.toModel(currentUserId: String?): Event = Event(
     id = id,

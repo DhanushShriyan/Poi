@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
@@ -25,6 +26,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,6 +64,7 @@ fun DiscoverScreen(
     val attendance by repository.attendance.collectAsStateWithLifecycle()
     val profile by repository.profile.collectAsStateWithLifecycle()
     val settings by repository.settings.collectAsStateWithLifecycle()
+    val syncState by repository.syncState.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(EventCategory.ALL) }
     var showRadiusPicker by remember { mutableStateOf(false) }
@@ -144,6 +147,34 @@ fun DiscoverScreen(
                             )
                         }
                         Button(onClick = onSignIn) { Text("Sign in") }
+                    }
+                }
+            }
+        }
+
+        if (syncState.isCloudBacked && events.isEmpty() && (syncState.isLoading || !syncState.isConnected)) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Icon(Icons.Default.CloudOff, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (syncState.isLoading) "Loading nearby events…" else "Events are temporarily unavailable",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            syncState.errorMessage ?: "Poi is securely reconnecting to the event service.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (!syncState.isLoading) {
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedButton(onClick = { scope.launch { runCatching { repository.refresh() } } }) {
+                                Text("Retry")
+                            }
+                        }
                     }
                 }
             }

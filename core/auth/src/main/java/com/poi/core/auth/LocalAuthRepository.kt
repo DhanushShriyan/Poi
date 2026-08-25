@@ -102,6 +102,10 @@ class LocalAuthRepository(
         preferences.edit().clear().apply()
     }
 
+    override suspend fun deleteAccount(): Result<Unit> = runCatching {
+        signOut()
+    }
+
     private fun createMember(email: String, displayName: String, provider: AuthProvider): Result<AuthUser> =
         runCatching {
             val normalizedEmail = email.trim().lowercase(Locale.ROOT)

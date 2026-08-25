@@ -39,5 +39,6 @@ interface AuthRepository {
     suspend fun requestPhoneCode(phone: String): Result<PhoneChallenge>
     suspend fun verifyPhoneCode(phone: String, code: String): Result<AuthUser>
     suspend fun signInAsAdmin(email: String, accessCode: String): Result<AuthUser>
+    suspend fun deleteAccount(): Result<Unit>
     suspend fun signOut()
 }

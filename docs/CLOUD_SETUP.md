@@ -10,14 +10,23 @@ As checked on 19 August 2026, Supabase Free advertises 50,000 monthly active use
 
 ## 2. Apply the database
 
-Run `supabase/migrations/202608190001_poi_core.sql` in the Supabase SQL editor. It creates:
+Run these migrations in filename order in the Supabase SQL editor:
+
+1. `supabase/migrations/202608190001_poi_core.sql`
+2. `supabase/migrations/202608210001_event_moments.sql`
+3. `supabase/migrations/202608250001_release_02_connected_foundation.sql`
+
+Together they create:
 
 - profiles with protected member/admin roles;
 - public, circle, and invite-only event records;
 - attendance and check-in visibility;
 - event reports and moderation state;
 - row-level security for guests, members, owners, and administrators;
-- realtime publication for event changes;
+- attendee-only event photo contributions with likes, comments, views, and private storage;
+- explicit membership for circle and invite-only events;
+- server-authoritative attendance totals and realtime event, attendance, report, profile, and moment updates;
+- administrator-only audit history and a protected account-deletion function;
 - three starter events for the first connected test.
 
 The same migration can be deployed with the Supabase CLI after linking the project:
@@ -84,4 +93,5 @@ The admin entry remains hidden in Poi: sign out, open **Profile**, then press an
 - Admin status lives only in the protected `profiles.role` column; a hidden screen is not treated as authorization.
 - Row-level security remains enabled on every connected table.
 - Public keys in an APK are expected; database policies are the security boundary.
-- Add audit logging and account/session revocation before a large public launch.
+- Uploaded moment files are removed by the signed-in client before the protected account-deletion function removes the account data.
+- Revoke active sessions and review the audit log if an account or administrator credential is suspected to be compromised.

@@ -1,26 +1,28 @@
 # Poi Android
 
-Poi is a privacy-first, hyperlocal event discovery and friend-planning Android app. This repository contains a modular native Android MVP that works without a cloud account, paid API, or map key.
+Poi is a privacy-first, hyperlocal event discovery and friend-planning Android app. This repository contains a modular native Android app backed by Supabase's free tier, with a local preview fallback for builds that do not contain cloud configuration.
 
 ## Test build capabilities
 
 - Browse, search, and filter realistic nearby events before creating an account.
 - Switch between persisted light and dark appearances.
-- Preview Google, email, and phone onboarding flows.
+- Create and use real email accounts, with Google OAuth and phone OTP gated until their providers are configured.
 - See live, upcoming, verified, private, and community-submitted event states.
 - Mark events as interested, going, or checked in.
 - Keep check-in visibility private, friends-only, or event-visible.
-- Create public, circle, or invitation-only events and persist them on-device.
+- Create public, circle, or invitation-only events and sync them across devices.
 - View personal plans and profile statistics.
 - Share event details and open directions in the installed maps app.
-- Report events and hide reported content locally.
+- Upload event photos, then view, like, comment, share, and delete them under the event.
+- Report events and hide reported content, with protected administrator moderation.
+- Edit a synced profile, monitor cloud connection health, retry failed loads, and permanently delete an account.
 - Configure privacy and notification preferences.
 - Detect, download, and hand off signed updates from GitHub Releases.
 - Use a role-protected administrator console to review reports and edit, cancel, feature, verify, restore, or delete any event.
 
-The test build uses offline repositories with local persistence. `EventRepository` and `AuthRepository` are boundaries for later Supabase implementations, so cloud sync and verified identity can be added without rewriting feature screens.
+Release builds use Supabase for accounts, profiles, events, attendance, reports, event moments, and realtime refresh. Debug builds use the same connected path when `supabase.properties` is configured, otherwise they fall back to isolated local preview data.
 
-Google and phone screens in this APK are interaction previews; they do not claim to verify a real Google account or send an SMS. See [docs/ADMIN_ACCESS.md](docs/ADMIN_ACCESS.md) for restricted access and the production security boundary.
+Google sign-in becomes real when its Supabase provider and build flag are enabled. Phone OTP stays off until an SMS provider and abuse controls are configured because SMS is not reliably free. See [docs/ADMIN_ACCESS.md](docs/ADMIN_ACCESS.md) for restricted access and the production security boundary.
 
 ## Modules
 
@@ -28,8 +30,8 @@ Google and phone screens in this APK are interaction previews; they do not claim
 |---|---|
 | `app` | App shell, navigation, dependency assembly |
 | `core:model` | Platform-independent product models |
-| `core:data` | Repository contract and offline implementation |
-| `core:auth` | Authentication contract, preview identity, and admin policy |
+| `core:data` | Repository contracts plus Supabase and local-preview implementations |
+| `core:auth` | Supabase authentication, preview identity, account deletion, and admin policy |
 | `core:designsystem` | Theme and shared UI components |
 | `core:update` | Release checking, APK download, and installer handoff |
 | `feature:discover` | Discovery feed and event details |
@@ -59,4 +61,4 @@ Android does not permit ordinary apps to install themselves silently. The user m
 
 ## Production services
 
-No credentials are committed. Release signing values live in local ignored files and GitHub Actions secrets. The planned Supabase, Firebase Cloud Messaging, and Google Play setup is documented in [docs/CLOUD_SETUP.md](docs/CLOUD_SETUP.md).
+No credentials are committed. Release signing values live in local ignored files and GitHub Actions secrets. Supabase setup and the deliberately deferred Firebase Cloud Messaging and Google Play work are documented in [docs/CLOUD_SETUP.md](docs/CLOUD_SETUP.md).

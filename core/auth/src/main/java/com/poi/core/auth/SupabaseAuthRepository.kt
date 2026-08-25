@@ -12,7 +12,9 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.OTP
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.storage.storage
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -135,6 +137,23 @@ class SupabaseAuthRepository(
         _session.value = AuthSession()
     }
 
+    override suspend fun deleteAccount(): Result<Unit> = runCatching {
+        val user = checkNotNull(cloud.supabase.auth.currentUserOrNull()) {
+            "Sign in to delete this account."
+        }
+        val imagePaths = cloud.supabase.from("event_moments")
+            .select(columns = Columns.list("image_path")) {
+                filter { eq("author_id", user.id) }
+            }
+            .decodeList<AccountMomentRow>()
+            .map(AccountMomentRow::imagePath)
+        imagePaths.forEach { imagePath ->
+            cloud.supabase.storage.from("event-moments").delete(imagePath)
+        }
+        cloud.supabase.postgrest.rpc("delete_poi_account")
+        _session.value = AuthSession()
+    }
+
     private suspend fun loadRole(userId: String): UserRole = runCatching {
         cloud.supabase.from("profiles")
             .select(columns = Columns.list("role")) {
@@ -181,4 +200,9 @@ class SupabaseAuthRepository(
 @Serializable
 private data class ProfileRoleRow(
     @SerialName("role") val role: String,
+)
+
+@Serializable
+private data class AccountMomentRow(
+    @SerialName("image_path") val imagePath: String,
 )

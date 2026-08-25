@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.LightMode
@@ -31,16 +32,19 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SystemUpdateAlt
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -53,6 +57,7 @@ import com.poi.core.designsystem.PoiSectionHeader
 import com.poi.core.designsystem.PoiStatusPill
 import com.poi.core.model.AuthUser
 import com.poi.core.model.UserRole
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -69,7 +74,9 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
 ) {
     val profile by repository.profile.collectAsStateWithLifecycle()
+    val syncState by repository.syncState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -78,10 +85,10 @@ fun ProfileScreen(
     ) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                PoiInitialAvatar(authUser.displayName, Modifier.size(78.dp))
+                PoiInitialAvatar(profile.displayName, Modifier.size(78.dp))
                 Spacer(Modifier.padding(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(authUser.displayName, style = MaterialTheme.typography.headlineMedium)
+                    Text(profile.displayName, style = MaterialTheme.typography.headlineMedium)
                     Text(
                         authUser.email ?: authUser.phone ?: profile.handle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -130,14 +137,41 @@ fun ProfileScreen(
                 shape = RoundedCornerShape(22.dp),
             ) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CloudOff, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        when {
+                            !syncState.isCloudBacked -> Icons.Default.CloudOff
+                            syncState.isLoading -> Icons.Default.Sync
+                            syncState.isConnected -> Icons.Default.CloudDone
+                            else -> Icons.Default.CloudOff
+                        },
+                        null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
                     Spacer(Modifier.padding(6.dp))
-                    Column {
-                        Text("Private offline test mode", style = MaterialTheme.typography.titleMedium)
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            "Your test data stays on this device until cloud sync is connected.",
+                            when {
+                                !syncState.isCloudBacked -> "Private offline test mode"
+                                syncState.isLoading -> "Connecting securely…"
+                                syncState.isConnected -> "Connected to Poi cloud"
+                                else -> "Cloud connection interrupted"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            when {
+                                !syncState.isCloudBacked -> "Your test data stays on this device until cloud sync is connected."
+                                syncState.isConnected -> "Events, attendance and profile changes are synced across your devices."
+                                else -> syncState.errorMessage ?: "Check your connection and retry."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        if (syncState.isCloudBacked && !syncState.isConnected && !syncState.isLoading) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(onClick = { scope.launch { runCatching { repository.refresh() } } }) {
+                                Text("Retry")
+                            }
+                        }
                     }
                 }
             }

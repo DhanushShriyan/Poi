@@ -37,4 +37,4 @@ The local keystore and `keystore.properties` are ignored by Git. Losing both the
 
 ## Version policy
 
-The initial update-ready build is version `0.1.0` with version code `1`. GitHub Actions uses version names `0.1.<workflow run number>` and version codes starting at `1001`, guaranteeing that each published build can replace the previous one.
+The initial update-ready build is version `0.1.0` with version code `1`. Release 0.2 uses version names `0.2.<workflow run number>` and version codes starting above `2000`, guaranteeing that each newly published build can replace every earlier test release.

@@ -128,6 +128,7 @@ private fun PoiApp(
     val showBottomBar = topDestinations.any { it.route == currentRoute }
     val session by authRepository.session.collectAsStateWithLifecycle()
     val settings by repository.settings.collectAsStateWithLifecycle()
+    val profile by repository.profile.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val signIn = { navController.navigate(Routes.SignIn) }
     val setDarkMode: (Boolean) -> Unit = { dark ->
@@ -149,7 +150,7 @@ private fun PoiApp(
                 DiscoverScreen(
                     repository = repository,
                     isGuest = !session.isAuthenticated,
-                    displayName = session.user?.displayName,
+                    displayName = profile.displayName,
                     onSignIn = signIn,
                     onEventClick = { navController.navigate(Routes.event(it)) },
                 )
@@ -173,7 +174,7 @@ private fun PoiApp(
                 if (session.isAuthenticated) {
                     CreateEventScreen(
                         repository = repository,
-                        organizerName = session.user?.displayName ?: "Poi member",
+                        organizerName = profile.displayName,
                         onCreated = { eventId -> navController.navigate(Routes.event(eventId)) },
                     )
                 } else {
@@ -281,7 +282,14 @@ private fun PoiApp(
                 }
             }
             composable(Routes.Settings) {
-                if (session.isAuthenticated) SettingsScreen(repository, onBack = { navController.popBackStack() })
+                if (session.isAuthenticated) {
+                    SettingsScreen(
+                        repository = repository,
+                        deleteAccount = authRepository::deleteAccount,
+                        onBack = { navController.popBackStack() },
+                        onAccountDeleted = { navController.navigateTopLevel(Routes.Profile) },
+                    )
+                }
             }
             composable(Routes.Safety) {
                 SafetyScreen(onBack = { navController.popBackStack() })

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2 connected foundation — 2026-08-25
+
+- Connected email accounts, profiles, events, attendance, reports, and event moments to Supabase.
+- Added realtime event refresh, visible connection health, resilient retries, and server-authoritative attendance counts.
+- Added editable synced profiles and privacy-aware permanent account deletion, including uploaded-image cleanup.
+- Added private-event membership policies, stricter row-level security, protected administrator controls, and an immutable admin audit log.
+- Kept Google OAuth ready behind configuration and phone OTP disabled until a safe SMS provider is selected.
+- Added Release 0.2 tests and retained automatic signed GitHub update delivery.
+
 ## 0.1.0 update delivery
 
 - Added automatic GitHub Release checks for signed production builds.
