@@ -1,0 +1,27 @@
+# Build output and machine-specific configuration
+.gradle/
+.kotlin/
+**/build/
+.idea/
+*.iml
+local.properties
+.tooling/
+
+# Never archive credentials or private signing material
+*.jks
+*.keystore
+keystore.properties
+supabase.properties
+admin.properties
+google-services.json
+service-account*.json
+.env
+.env.*
+
+# Only the two deliberately archived test APKs are tracked
+*.apk
+!prototypes/scribble-theme/dist/poi-scribble-theme-demo.apk
+!prototypes/geometric-retro/dist/poi-geometric-retro-demo.apk
+*.aab
+.DS_Store
+Thumbs.db
