@@ -50,4 +50,33 @@ class January2026CalendarTest {
         assertEquals(29, populatedDates)
         assertEquals("Sharada Calendar 2026", January2026Calendar.SOURCE)
     }
+
+    @Test
+    fun `English is the default calendar language`() {
+        assertEquals(LocalCalendarLanguage.ENGLISH, LocalCalendarLanguage.DEFAULT)
+        assertEquals(LocalCalendarLanguage.ENGLISH, LocalCalendarLanguage.fromStorage(null))
+        assertEquals(LocalCalendarLanguage.KANNADA, LocalCalendarLanguage.fromStorage("kn"))
+    }
+
+    @Test
+    fun `every Kannada source record has an English display title`() {
+        val untranslated = January2026Calendar.days
+            .flatMap { it.observances }
+            .filter { observance ->
+                observance.title.any { it in '\u0C80'..'\u0CFF' } &&
+                    observance.displayTitle(LocalCalendarLanguage.ENGLISH) == observance.title
+            }
+
+        assertTrue("Missing English titles: ${untranslated.map { it.title }}", untranslated.isEmpty())
+        assertEquals(
+            "Makara Sankramana",
+            January2026Calendar.day(14).observances.first { it.featured }
+                .displayTitle(LocalCalendarLanguage.ENGLISH),
+        )
+        assertEquals(
+            "Republic Day",
+            January2026Calendar.day(26).observances.first { it.featured }
+                .displayTitle(LocalCalendarLanguage.ENGLISH),
+        )
+    }
 }

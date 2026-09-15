@@ -5,6 +5,7 @@
 - Added a subtle January 2026 local-calendar entry point to Discover.
 - Added a dot-based month overview with progressive disclosure for detailed observances.
 - Added reviewed bundled Sharada Calendar entries plus Mangaluru sunrise and sunset data.
+- Made English the calendar default and added a persistent English/ಕನ್ನಡ language switch.
 - Isolated calendar models, data, UI, and tests in a dedicated feature module for safe month-by-month expansion.
 
 ## 0.4 location + social release — 2026-08-26

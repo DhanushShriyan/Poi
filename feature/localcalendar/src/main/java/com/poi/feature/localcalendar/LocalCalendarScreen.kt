@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,13 +49,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun LocalCalendarEntryCard(
@@ -124,17 +125,34 @@ fun LocalCalendarScreen(
 ) {
     var selectedDay by remember { mutableIntStateOf(25) }
     var showDetails by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences(LOCAL_CALENDAR_PREFERENCES, 0)
+    }
+    var language by remember(preferences) {
+        mutableStateOf(
+            LocalCalendarLanguage.fromStorage(
+                preferences.getString(LOCAL_CALENDAR_LANGUAGE, null),
+            ),
+        )
+    }
+    val strings = language.strings
     val selected = January2026Calendar.day(selectedDay)
+
+    fun selectLanguage(selectedLanguage: LocalCalendarLanguage) {
+        language = selectedLanguage
+        preferences.edit().putString(LOCAL_CALENDAR_LANGUAGE, selectedLanguage.storageValue).apply()
+    }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Local calendar") },
+                title = { Text(strings.screenTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -150,24 +168,31 @@ fun LocalCalendarScreen(
         ) {
             item {
                 Column {
-                    Text("January 2026", style = MaterialTheme.typography.headlineLarge)
+                    Text(strings.monthTitle, style = MaterialTheme.typography.headlineLarge)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Tap a date to see a quiet preview.",
+                        strings.dateHint,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    LanguageSelector(
+                        language = language,
+                        onLanguageSelected = ::selectLanguage,
                     )
                 }
             }
             item {
                 MonthGrid(
                     selectedDay = selectedDay,
+                    language = language,
                     onDaySelected = { selectedDay = it },
                 )
             }
-            item { CalendarLegend() }
+            item { CalendarLegend(language) }
             item {
                 DayPreviewCard(
                     day = selected,
+                    language = language,
                     onViewAll = { showDetails = true },
                 )
             }
@@ -177,7 +202,27 @@ fun LocalCalendarScreen(
     if (showDetails) {
         DayDetailsSheet(
             day = selected,
+            language = language,
             onDismiss = { showDetails = false },
+        )
+    }
+}
+
+@Composable
+private fun LanguageSelector(
+    language: LocalCalendarLanguage,
+    onLanguageSelected: (LocalCalendarLanguage) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(
+            selected = language == LocalCalendarLanguage.ENGLISH,
+            onClick = { onLanguageSelected(LocalCalendarLanguage.ENGLISH) },
+            label = { Text("English") },
+        )
+        FilterChip(
+            selected = language == LocalCalendarLanguage.KANNADA,
+            onClick = { onLanguageSelected(LocalCalendarLanguage.KANNADA) },
+            label = { Text("ಕನ್ನಡ") },
         )
     }
 }
@@ -185,6 +230,7 @@ fun LocalCalendarScreen(
 @Composable
 private fun MonthGrid(
     selectedDay: Int,
+    language: LocalCalendarLanguage,
     onDaySelected: (Int) -> Unit,
 ) {
     val leadingEmptyCells = January2026Calendar.month.atDay(1).dayOfWeek.value % 7
@@ -196,7 +242,7 @@ private fun MonthGrid(
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(Modifier.fillMaxWidth()) {
-            listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { weekday ->
+            language.strings.weekdays.forEach { weekday ->
                 Text(
                     text = weekday,
                     modifier = Modifier.weight(1f),
@@ -271,14 +317,15 @@ private fun MonthDayCell(
 }
 
 @Composable
-private fun CalendarLegend() {
+private fun CalendarLegend(language: LocalCalendarLanguage) {
+    val strings = language.strings
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        LegendItem(LocalObservanceKind.LOCAL, "Local")
-        LegendItem(LocalObservanceKind.FESTIVAL, "Festival")
-        LegendItem(LocalObservanceKind.CIVIC, "Civic")
+        LegendItem(LocalObservanceKind.LOCAL, strings.local)
+        LegendItem(LocalObservanceKind.FESTIVAL, strings.festival)
+        LegendItem(LocalObservanceKind.CIVIC, strings.civic)
     }
 }
 
@@ -294,34 +341,38 @@ private fun LegendItem(kind: LocalObservanceKind, label: String) {
 @Composable
 private fun DayPreviewCard(
     day: LocalCalendarDay,
+    language: LocalCalendarLanguage,
     onViewAll: () -> Unit,
 ) {
-    val formatter = remember { DateTimeFormatter.ofPattern("EEE · d MMM", Locale.ENGLISH) }
+    val strings = language.strings
+    val formatter = remember(language) {
+        DateTimeFormatter.ofPattern("EEE · d MMM", language.locale)
+    }
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = MaterialTheme.shapes.large,
     ) {
         Column(Modifier.fillMaxWidth().padding(18.dp)) {
             Text(
-                day.date.format(formatter).uppercase(Locale.ENGLISH),
+                day.date.format(formatter).uppercase(language.locale),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.secondary,
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                if (day.observances.isEmpty()) "No listed observances" else observanceCount(day.observances.size),
+                if (day.observances.isEmpty()) strings.noObservances else strings.observanceCount(day.observances.size),
                 style = MaterialTheme.typography.titleLarge,
             )
             if (day.observances.isEmpty()) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Sunrise and sunset information is still available for this date.",
+                    strings.emptyDayHint,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 Spacer(Modifier.height(12.dp))
                 day.observances.take(2).forEachIndexed { index, observance ->
-                    PreviewRow(observance)
+                    PreviewRow(observance, language)
                     if (index == 0 && day.observances.size > 1) {
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 8.dp),
@@ -331,7 +382,7 @@ private fun DayPreviewCard(
                 }
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = onViewAll, contentPadding = PaddingValues(0.dp)) {
-                    Text("View all ${day.observances.size}")
+                    Text(strings.viewAll(day.observances.size))
                     Spacer(Modifier.width(4.dp))
                     Icon(Icons.Default.ChevronRight, contentDescription = null, Modifier.size(18.dp))
                 }
@@ -359,12 +410,15 @@ private fun DayPreviewCard(
 }
 
 @Composable
-private fun PreviewRow(observance: LocalObservance) {
+private fun PreviewRow(
+    observance: LocalObservance,
+    language: LocalCalendarLanguage,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         ObservanceDot(observance.kind, size = 8)
         Spacer(Modifier.width(12.dp))
         Text(
-            observance.title,
+            observance.displayTitle(language),
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 2,
@@ -382,13 +436,17 @@ private fun PreviewRow(observance: LocalObservance) {
 @Composable
 private fun DayDetailsSheet(
     day: LocalCalendarDay,
+    language: LocalCalendarLanguage,
     onDismiss: () -> Unit,
 ) {
     var expanded by remember(day.date) { mutableStateOf(false) }
     val featured = day.observances.firstOrNull { it.featured }
     val regular = day.observances.filterNot { it.featured }
     val visibleRegular = if (expanded) regular else regular.take(3)
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.ENGLISH) }
+    val strings = language.strings
+    val dateFormatter = remember(language) {
+        DateTimeFormatter.ofPattern("EEEE, d MMMM", language.locale)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -403,22 +461,22 @@ private fun DayDetailsSheet(
                 Text(day.date.format(dateFormatter), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    observanceCount(day.observances.size),
+                    strings.observanceCount(day.observances.size),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            featured?.let { item { FeaturedObservance(it) } }
+            featured?.let { item { FeaturedObservance(it, language) } }
             if (regular.isNotEmpty()) {
                 item {
                     Text(
-                        "LOCAL OBSERVANCES",
+                        strings.localObservances,
                         style = MaterialTheme.typography.labelLarge,
                         letterSpacing = 0.8.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 items(visibleRegular.size) { index ->
-                    DetailObservanceRow(visibleRegular[index])
+                    DetailObservanceRow(visibleRegular[index], language)
                 }
                 if (regular.size > 3) {
                     item {
@@ -426,7 +484,7 @@ private fun DayDetailsSheet(
                             onClick = { expanded = !expanded },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(if (expanded) "Show less" else "Show ${regular.size - 3} more")
+                            Text(if (expanded) strings.showLess else strings.showMore(regular.size - 3))
                             Spacer(Modifier.width(4.dp))
                             Icon(
                                 Icons.Default.ExpandMore,
@@ -442,13 +500,13 @@ private fun DayDetailsSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    SunTimeCard("Sunrise", day.sunrise.formatTime(), Modifier.weight(1f))
-                    SunTimeCard("Sunset", day.sunset.formatTime(), Modifier.weight(1f))
+                    SunTimeCard(strings.sunrise, day.sunrise.formatTime(language), Modifier.weight(1f))
+                    SunTimeCard(strings.sunset, day.sunset.formatTime(language), Modifier.weight(1f))
                 }
             }
             item {
                 Text(
-                    "Source: ${January2026Calendar.SOURCE} · Sunrise and sunset for Mangaluru",
+                    strings.source,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -458,7 +516,10 @@ private fun DayDetailsSheet(
 }
 
 @Composable
-private fun FeaturedObservance(observance: LocalObservance) {
+private fun FeaturedObservance(
+    observance: LocalObservance,
+    language: LocalCalendarLanguage,
+) {
     Surface(
         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.13f),
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -470,20 +531,23 @@ private fun FeaturedObservance(observance: LocalObservance) {
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    "FEATURED",
+                    language.strings.featured,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp,
                 )
-                Text(observance.title, style = MaterialTheme.typography.titleMedium)
+                Text(observance.displayTitle(language), style = MaterialTheme.typography.titleMedium)
             }
         }
     }
 }
 
 @Composable
-private fun DetailObservanceRow(observance: LocalObservance) {
+private fun DetailObservanceRow(
+    observance: LocalObservance,
+    language: LocalCalendarLanguage,
+) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         shape = MaterialTheme.shapes.medium,
@@ -494,7 +558,11 @@ private fun DetailObservanceRow(observance: LocalObservance) {
         ) {
             ObservanceDot(observance.kind, size = 8)
             Spacer(Modifier.width(12.dp))
-            Text(observance.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                observance.displayTitle(language),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+            )
         }
     }
 }
@@ -537,8 +605,8 @@ private fun LocalObservanceKind.dotColor(): Color = when (this) {
     LocalObservanceKind.CIVIC -> MaterialTheme.colorScheme.primary
 }
 
-private fun observanceCount(count: Int): String =
-    "$count local observance${if (count == 1) "" else "s"}"
+private fun java.time.LocalTime.formatTime(language: LocalCalendarLanguage): String =
+    format(DateTimeFormatter.ofPattern("h:mm a", language.locale))
 
-private fun java.time.LocalTime.formatTime(): String =
-    format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+private const val LOCAL_CALENDAR_PREFERENCES = "poi_local_calendar"
+private const val LOCAL_CALENDAR_LANGUAGE = "language"
