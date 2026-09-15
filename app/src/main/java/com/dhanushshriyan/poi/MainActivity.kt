@@ -57,6 +57,7 @@ import com.poi.feature.auth.SignInScreen
 import com.poi.feature.create.CreateEventScreen
 import com.poi.feature.discover.DiscoverScreen
 import com.poi.feature.discover.EventDetailScreen
+import com.poi.feature.localcalendar.LocalCalendarScreen
 import com.poi.feature.plans.PlansScreen
 import com.poi.feature.profile.ProfileScreen
 import com.poi.feature.profile.SafetyScreen
@@ -100,6 +101,7 @@ private object Routes {
     const val People = "people"
     const val Profile = "profile"
     const val Event = "event/{eventId}"
+    const val LocalCalendar = "local-calendar"
     const val Settings = "settings"
     const val Safety = "safety"
     const val AppUpdates = "app-updates"
@@ -176,7 +178,11 @@ private fun PoiApp(
                     socialRepository = socialRepository,
                     onSignIn = signIn,
                     onEventClick = { navController.navigate(Routes.event(it)) },
+                    onLocalCalendarClick = { navController.navigate(Routes.LocalCalendar) },
                 )
+            }
+            composable(Routes.LocalCalendar) {
+                LocalCalendarScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.Plans) {
                 if (session.isAuthenticated) {

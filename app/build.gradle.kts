@@ -154,6 +154,7 @@ dependencies {
     implementation(project(":core:notifications"))
     implementation(project(":core:update"))
     implementation(project(":feature:discover"))
+    implementation(project(":feature:localcalendar"))
     implementation(project(":feature:plans"))
     implementation(project(":feature:create"))
     implementation(project(":feature:profile"))

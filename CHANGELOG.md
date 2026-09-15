@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — local calendar
+
+- Added a subtle January 2026 local-calendar entry point to Discover.
+- Added a dot-based month overview with progressive disclosure for detailed observances.
+- Added reviewed bundled Sharada Calendar entries plus Mangaluru sunrise and sunset data.
+- Isolated calendar models, data, UI, and tests in a dedicated feature module for safe month-by-month expansion.
+
 ## 0.4 location + social release — 2026-08-26
 
 - Added foreground-only location discovery with real on-device distance calculation and user-selected radius filtering.

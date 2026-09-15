@@ -37,6 +37,7 @@ include(
     ":core:notifications",
     ":core:update",
     ":feature:discover",
+    ":feature:localcalendar",
     ":feature:plans",
     ":feature:create",
     ":feature:profile",

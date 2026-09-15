@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.poi.feature.discover"
+    namespace = "com.poi.feature.localcalendar"
     compileSdk = 36
 
     defaultConfig { minSdk = 26 }
@@ -17,20 +17,12 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:model"))
-    implementation(project(":core:data"))
     implementation(project(":core:designsystem"))
-    implementation(project(":core:location"))
-    implementation(project(":feature:localcalendar"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.coil.compose)
-    implementation(libs.coil.network.okhttp)
+    testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -60,6 +60,7 @@ import com.poi.core.model.AttendanceStatus
 import com.poi.core.model.EventCategory
 import com.poi.core.model.isLive
 import com.poi.core.model.withDistanceFrom
+import com.poi.feature.localcalendar.LocalCalendarEntryCard
 import kotlinx.coroutines.launch
 
 @Composable
@@ -71,6 +72,7 @@ fun DiscoverScreen(
     socialRepository: SocialRepository,
     onSignIn: () -> Unit,
     onEventClick: (String) -> Unit,
+    onLocalCalendarClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val events by repository.events.collectAsStateWithLifecycle()
@@ -304,6 +306,12 @@ fun DiscoverScreen(
                         label = { Text("${item.symbol}  ${item.label}") },
                     )
                 }
+            }
+        }
+
+        if (browsingAll) {
+            item {
+                LocalCalendarEntryCard(onClick = onLocalCalendarClick)
             }
         }
 
