@@ -2,6 +2,11 @@
 
 ## Unreleased — themes and local calendar
 
+- Migrated production accounts and event data to the permanent Supabase project.
+- Restored email sign-up and sign-in with clear validation and user-friendly recovery errors.
+- Added live starter events plus an offline event fallback so Discover remains useful during outages.
+- Made newly published events appear immediately and added reliable failure recovery to event creation.
+
 - Added Classic, Poi Pulse Lab, and Poi Retro Lab as production app-wide styles.
 - Added a clean Profile appearance selector for guests and signed-in users, with Classic as the default.
 - Persisted the chosen app style locally and retained light/dark appearance controls for every style.

@@ -46,10 +46,10 @@ class SupabaseEventRepository(
     private val reportedIds = mutableSetOf<String>()
     private val eventRows = MutableStateFlow<List<EventRow>>(emptyList())
 
-    private val _events = MutableStateFlow<List<Event>>(emptyList())
+    private val _events = MutableStateFlow(localPreferences.events.value)
     override val events: StateFlow<List<Event>> = _events.asStateFlow()
 
-    private val _allEvents = MutableStateFlow<List<Event>>(emptyList())
+    private val _allEvents = MutableStateFlow(localPreferences.allEvents.value)
     override val allEvents: StateFlow<List<Event>> = _allEvents.asStateFlow()
 
     private val _reportedEvents = MutableStateFlow<List<EventReport>>(emptyList())
@@ -89,9 +89,9 @@ class SupabaseEventRepository(
                 .catch { error -> markFailure(error) }
                 .collectLatest { rows ->
                     eventRows.value = rows
+                    markSuccess()
                     refreshEvents()
                     refreshProfileCounts()
-                    markSuccess()
                 }
         }
         scope.launch {
@@ -171,7 +171,7 @@ class SupabaseEventRepository(
 
     override suspend fun createEvent(newEvent: NewEvent): Event = connectedOperation {
         requireUserId()
-        cloud.supabase.from("events").insert(
+        val createdRow = cloud.supabase.from("events").insert(
             NewEventRow(
                 title = newEvent.title.trim(),
                 summary = newEvent.summary.trim(),
@@ -190,7 +190,11 @@ class SupabaseEventRepository(
             ),
         ) { select() }
             .decodeSingle<EventRow>()
-            .toModel(authRepository.session.value.user?.id)
+        eventRows.value = (eventRows.value.filterNot { it.id == createdRow.id } + createdRow)
+            .sortedBy(EventRow::startsAtMillis)
+        refreshEvents()
+        refreshProfileCounts()
+        createdRow.toModel(authRepository.session.value.user?.id)
     }
 
     override suspend fun reportEvent(eventId: String, reason: String) = connectedOperation {
@@ -378,9 +382,24 @@ class SupabaseEventRepository(
         _syncState.value = _syncState.value.copy(
             isLoading = false,
             isConnected = false,
-            errorMessage = error.message?.takeIf(String::isNotBlank)
-                ?: "Poi could not reach the service. Check your connection and retry.",
+            errorMessage = serviceErrorMessage(error),
         )
+    }
+}
+
+internal fun serviceErrorMessage(error: Throwable): String {
+    val message = error.message.orEmpty()
+    val normalized = message.lowercase()
+    return when {
+        normalized.contains("unable to resolve host") ||
+            normalized.contains("no address associated with hostname") ||
+            normalized.contains("failed to connect") ||
+            normalized.contains("timeout") ->
+            "Poi could not reach the service. Check your connection and retry."
+        normalized.contains("row-level security") || normalized.contains("permission denied") ->
+            "Your account does not have permission to make that change. Please sign in again."
+        message.isBlank() -> "Poi could not complete that request. Please try again."
+        else -> message.lineSequence().first().take(180)
     }
 }
 

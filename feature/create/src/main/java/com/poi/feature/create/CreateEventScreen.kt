@@ -78,6 +78,7 @@ fun CreateEventScreen(
     var accepted by remember { mutableStateOf(false) }
     var showErrors by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var publishError by remember { mutableStateOf<String?>(null) }
     var attachCoordinates by remember { mutableStateOf(false) }
     var checkInRadiusMeters by remember { mutableStateOf(500) }
     val scope = rememberCoroutineScope()
@@ -316,26 +317,32 @@ fun CreateEventScreen(
                         return@Button
                     }
                     saving = true
+                    publishError = null
                     val starts = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(dateChoice.dayOffset.toLong())
                     scope.launch {
-                        val event = repository.createEvent(
-                            NewEvent(
-                                title = title,
-                                summary = summary,
-                                category = category,
-                                startsAtMillis = starts,
-                                endsAtMillis = starts + TimeUnit.HOURS.toMillis(4),
-                                venue = venue,
-                                address = address,
-                                visibility = visibility,
-                                organizerName = organizerName,
-                                latitude = locationState.snapshot?.point?.latitude.takeIf { attachCoordinates },
-                                longitude = locationState.snapshot?.point?.longitude.takeIf { attachCoordinates },
-                                checkInRadiusMeters = checkInRadiusMeters,
-                            ),
-                        )
+                        runCatching {
+                            repository.createEvent(
+                                NewEvent(
+                                    title = title,
+                                    summary = summary,
+                                    category = category,
+                                    startsAtMillis = starts,
+                                    endsAtMillis = starts + TimeUnit.HOURS.toMillis(4),
+                                    venue = venue,
+                                    address = address,
+                                    visibility = visibility,
+                                    organizerName = organizerName,
+                                    latitude = locationState.snapshot?.point?.latitude.takeIf { attachCoordinates },
+                                    longitude = locationState.snapshot?.point?.longitude.takeIf { attachCoordinates },
+                                    checkInRadiusMeters = checkInRadiusMeters,
+                                ),
+                            )
+                        }.onSuccess { event ->
+                            onCreated(event.id)
+                        }.onFailure { throwable ->
+                            publishError = createEventErrorMessage(throwable)
+                        }
                         saving = false
-                        onCreated(event.id)
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
@@ -345,7 +352,39 @@ fun CreateEventScreen(
                 Spacer(Modifier.padding(4.dp))
                 Text(if (saving) "Publishing…" else "Publish for review")
             }
+            publishError?.let { message ->
+                Spacer(Modifier.height(10.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Text(
+                        message,
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
+            }
         }
+    }
+}
+
+internal fun createEventErrorMessage(error: Throwable): String {
+    val message = error.message.orEmpty()
+    val normalized = message.lowercase()
+    return when {
+        normalized.contains("unable to resolve host") ||
+            normalized.contains("no address associated with hostname") ||
+            normalized.contains("failed to connect") ||
+            normalized.contains("timeout") ->
+            "Poi could not reach the event service. Check your internet connection and try again."
+        normalized.contains("sign in") || normalized.contains("jwt") ->
+            "Your session has expired. Sign in again, then publish the event."
+        normalized.contains("row-level security") || normalized.contains("permission denied") ->
+            "This account cannot publish the event yet. Sign out, sign in, and retry."
+        else -> "We couldn't publish this event. Please review the details and try again."
     }
 }
 

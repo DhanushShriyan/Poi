@@ -80,7 +80,7 @@ fun SignInScreen(
                 onSuccess = {
                     if (authRepository.session.value.isAuthenticated) onSignedIn()
                 },
-                onFailure = { error = it.message ?: "Sign-in could not be completed" },
+                onFailure = { error = friendlyAuthError(it) },
             )
             loading = false
         }
@@ -228,6 +228,17 @@ fun SignInScreen(
                         Button(
                             enabled = !loading,
                             onClick = {
+                                val inputError = validateEmailAccountInput(
+                                    displayName = name,
+                                    email = email,
+                                    password = password,
+                                    creatingAccount = createAccount,
+                                )
+                                if (inputError != null) {
+                                    error = inputError
+                                    status = null
+                                    return@Button
+                                }
                                 complete {
                                     if (createAccount) {
                                         authRepository.createAccountWithEmail(email, password, name)
