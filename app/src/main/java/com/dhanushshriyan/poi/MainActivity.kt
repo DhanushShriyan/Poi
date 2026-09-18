@@ -47,6 +47,7 @@ import com.poi.core.data.SocialRepository
 import com.poi.core.designsystem.PoiTheme
 import com.poi.core.location.LocationRepository
 import com.poi.core.model.ThemeMode
+import com.poi.core.model.PoiVisualTheme
 import com.poi.core.notifications.EventReminderScheduler
 import com.poi.feature.admin.AdminDashboardScreen
 import com.poi.feature.admin.AdminEventEditorScreen
@@ -73,7 +74,10 @@ class MainActivity : ComponentActivity() {
         application.authRepository.handleAuthCallback(intent)
         setContent {
             val settings by application.eventRepository.settings.collectAsStateWithLifecycle()
-            PoiTheme(darkTheme = settings.themeMode == ThemeMode.DARK) {
+            PoiTheme(
+                darkTheme = settings.themeMode == ThemeMode.DARK,
+                visualTheme = settings.visualTheme,
+            ) {
                 PoiApp(
                     application.eventRepository,
                     application.authRepository,
@@ -155,6 +159,18 @@ private fun PoiApp(
             repository.updateSettings(settings.copy(themeMode = if (dark) ThemeMode.DARK else ThemeMode.LIGHT))
         }
     }
+    val setVisualTheme: (PoiVisualTheme) -> Unit = { visualTheme ->
+        scope.launch {
+            val recommendedMode = when (visualTheme) {
+                PoiVisualTheme.PULSE -> ThemeMode.DARK
+                PoiVisualTheme.RETRO -> ThemeMode.LIGHT
+                PoiVisualTheme.CLASSIC -> settings.themeMode
+            }
+            repository.updateSettings(
+                settings.copy(visualTheme = visualTheme, themeMode = recommendedMode),
+            )
+        }
+    }
 
     LaunchedEffect(events, attendance, settings.eventReminders) {
         reminderScheduler.sync(events, attendance, settings.eventReminders)
@@ -220,7 +236,9 @@ private fun PoiApp(
                 if (user == null) {
                     GuestProfileScreen(
                         darkMode = settings.themeMode == ThemeMode.DARK,
+                        visualTheme = settings.visualTheme,
                         onThemeChange = setDarkMode,
+                        onVisualThemeChange = setVisualTheme,
                         onSignIn = signIn,
                         onAdminAccess = { navController.navigate(Routes.AdminAccess) },
                         onAppUpdates = { navController.navigate(Routes.AppUpdates) },
@@ -230,8 +248,10 @@ private fun PoiApp(
                         repository = repository,
                         authUser = user,
                         darkMode = settings.themeMode == ThemeMode.DARK,
+                        visualTheme = settings.visualTheme,
                         versionName = BuildConfig.VERSION_NAME,
                         onThemeChange = setDarkMode,
+                        onVisualThemeChange = setVisualTheme,
                         onAdmin = { navController.navigate(Routes.Admin) },
                         onSignOut = {
                             scope.launch {

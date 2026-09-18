@@ -1,6 +1,7 @@
 package com.poi.core.model
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,5 +32,12 @@ class EventTest {
         assertFalse(event.isLive(999))
         assertFalse(event.isLive(2_001))
     }
-}
 
+    @Test fun classicIsTheSafeDefaultVisualTheme() {
+        assertEquals(PoiVisualTheme.CLASSIC, AppSettings().visualTheme)
+        assertEquals(
+            listOf("Classic", "Poi Pulse Lab", "Poi Retro Lab"),
+            PoiVisualTheme.entries.map { it.label },
+        )
+    }
+}

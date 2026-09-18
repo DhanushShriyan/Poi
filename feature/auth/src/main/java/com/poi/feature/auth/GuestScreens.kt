@@ -15,13 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.SystemUpdateAlt
@@ -31,7 +28,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,7 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.poi.core.designsystem.PoiHeroPanel
+import com.poi.core.designsystem.PoiAppearanceSelector
 import com.poi.core.designsystem.PoiWordmark
+import com.poi.core.model.PoiVisualTheme
 
 @Composable
 fun GuestGateScreen(
@@ -80,7 +78,9 @@ fun GuestGateScreen(
 @Composable
 fun GuestProfileScreen(
     darkMode: Boolean,
+    visualTheme: PoiVisualTheme,
     onThemeChange: (Boolean) -> Unit,
+    onVisualThemeChange: (PoiVisualTheme) -> Unit,
     onSignIn: () -> Unit,
     onAdminAccess: () -> Unit,
     onAppUpdates: () -> Unit,
@@ -92,12 +92,15 @@ fun GuestProfileScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                PoiWordmark(Modifier.weight(1f))
-                Icon(if (darkMode) Icons.Default.DarkMode else Icons.Default.LightMode, null)
-                Spacer(Modifier.size(8.dp))
-                Switch(checked = darkMode, onCheckedChange = onThemeChange)
-            }
+            PoiWordmark(Modifier.fillMaxWidth())
+        }
+        item {
+            PoiAppearanceSelector(
+                selectedTheme = visualTheme,
+                darkMode = darkMode,
+                onThemeSelected = onVisualThemeChange,
+                onDarkModeChanged = onThemeChange,
+            )
         }
         item {
             PoiHeroPanel {
@@ -154,12 +157,12 @@ fun GuestProfileScreen(
 private fun GuestBenefit(icon: ImageVector, title: String, supporting: String) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(46.dp).clip(RoundedCornerShape(15.dp))
+                Modifier.size(46.dp).clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {

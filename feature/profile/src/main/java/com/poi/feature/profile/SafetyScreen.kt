@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
@@ -52,7 +51,7 @@ fun SafetyScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    shape = RoundedCornerShape(22.dp),
+                    shape = MaterialTheme.shapes.large,
                 ) {
                     Column(Modifier.padding(18.dp)) {
                         Icon(Icons.Default.HealthAndSafety, null, tint = MaterialTheme.colorScheme.primary)
@@ -107,4 +106,3 @@ fun SafetyScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 }
-

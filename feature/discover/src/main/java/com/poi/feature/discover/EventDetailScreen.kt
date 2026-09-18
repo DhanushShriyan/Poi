@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -284,7 +283,7 @@ fun EventDetailScreen(
                     if (!isAuthenticated) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                            shape = RoundedCornerShape(20.dp),
+                            shape = MaterialTheme.shapes.large,
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Text("Keep this event close", style = MaterialTheme.typography.titleMedium)
@@ -513,7 +512,7 @@ private fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title
         Box(
             Modifier.size(44.dp).background(
                 MaterialTheme.colorScheme.primaryContainer,
-                RoundedCornerShape(14.dp),
+                MaterialTheme.shapes.small,
             ),
             contentAlignment = Alignment.Center,
         ) {
@@ -530,7 +529,7 @@ private fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title
 @Composable
 private fun OrganizerCard(event: Event) {
     Card(
-        shape = RoundedCornerShape(22.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

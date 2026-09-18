@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -24,9 +23,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -40,7 +37,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,9 +49,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.poi.core.data.EventRepository
 import com.poi.core.designsystem.PoiInitialAvatar
+import com.poi.core.designsystem.PoiAppearanceSelector
 import com.poi.core.designsystem.PoiSectionHeader
 import com.poi.core.designsystem.PoiStatusPill
 import com.poi.core.model.AuthUser
+import com.poi.core.model.PoiVisualTheme
 import com.poi.core.model.UserRole
 import kotlinx.coroutines.launch
 
@@ -64,8 +62,10 @@ fun ProfileScreen(
     repository: EventRepository,
     authUser: AuthUser,
     darkMode: Boolean,
+    visualTheme: PoiVisualTheme,
     versionName: String,
     onThemeChange: (Boolean) -> Unit,
+    onVisualThemeChange: (PoiVisualTheme) -> Unit,
     onAdmin: () -> Unit,
     onSignOut: () -> Unit,
     onSettings: () -> Unit,
@@ -100,24 +100,12 @@ fun ProfileScreen(
         }
 
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(20.dp),
-            ) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (darkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.padding(7.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(if (darkMode) "Dark appearance" else "Light appearance", style = MaterialTheme.typography.titleMedium)
-                        Text("Choose the look that feels comfortable", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = darkMode, onCheckedChange = onThemeChange)
-                }
-            }
+            PoiAppearanceSelector(
+                selectedTheme = visualTheme,
+                darkMode = darkMode,
+                onThemeSelected = onVisualThemeChange,
+                onDarkModeChanged = onThemeChange,
+            )
         }
 
         item {
@@ -134,7 +122,7 @@ fun ProfileScreen(
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                shape = RoundedCornerShape(22.dp),
+                shape = MaterialTheme.shapes.large,
             ) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -227,7 +215,7 @@ fun ProfileScreen(
         item {
             PoiSectionHeader("Trust profile")
             Spacer(Modifier.height(8.dp))
-            Card(shape = RoundedCornerShape(22.dp)) {
+            Card(shape = MaterialTheme.shapes.large) {
                 Column(Modifier.padding(16.dp)) {
                     TrustRow(Icons.Default.VerifiedUser, "Phone", "Connect during cloud setup")
                     TrustRow(Icons.Default.People, "Community contributions", "3 helpful confirmations")
@@ -266,7 +254,7 @@ private fun StatCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(Modifier.padding(12.dp)) {
@@ -287,7 +275,7 @@ private fun MenuCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

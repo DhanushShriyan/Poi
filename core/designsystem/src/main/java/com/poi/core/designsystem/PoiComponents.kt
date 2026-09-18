@@ -65,7 +65,7 @@ fun PoiSectionHeader(
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(MaterialTheme.shapes.small)
                     .clickable(onClick = onAction)
                     .padding(horizontal = 8.dp, vertical = 6.dp),
             )
@@ -97,15 +97,19 @@ fun PoiHeroPanel(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val heroColors = when (LocalPoiVisualTheme.current) {
+        com.poi.core.model.PoiVisualTheme.CLASSIC ->
+            listOf(MaterialTheme.colorScheme.primary, Color(0xFF7B61FF), Color(0xFF9C6CFF))
+        com.poi.core.model.PoiVisualTheme.PULSE ->
+            listOf(Color(0xFF252C27), Color(0xFF334537), Color(0xFF435A48))
+        com.poi.core.model.PoiVisualTheme.RETRO ->
+            listOf(Color(0xFF24251F), Color(0xFF2F6974), Color(0xFFB64C29))
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(MaterialTheme.colorScheme.primary, Color(0xFF7B61FF), Color(0xFF9C6CFF)),
-                ),
-            )
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(Brush.linearGradient(heroColors))
             .padding(22.dp),
     ) {
         content()
@@ -159,7 +163,7 @@ fun PoiEventArtwork(
     val colors = artworkColors(event.themeKey)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(26.dp))
+            .clip(MaterialTheme.shapes.large)
             .background(Brush.linearGradient(colors)),
     ) {
         Box(
@@ -194,14 +198,24 @@ fun PoiEventCard(
     modifier: Modifier = Modifier,
     featured: Boolean = false,
 ) {
+    val visualTheme = LocalPoiVisualTheme.current
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (visualTheme == com.poi.core.model.PoiVisualTheme.CLASSIC) 1.dp else 0.dp,
+        ),
+        border = BorderStroke(
+            if (visualTheme == com.poi.core.model.PoiVisualTheme.RETRO) 1.5.dp else 1.dp,
+            if (visualTheme == com.poi.core.model.PoiVisualTheme.RETRO) {
+                MaterialTheme.colorScheme.outline
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            },
+        ),
     ) {
         PoiEventArtwork(event, Modifier.fillMaxWidth().height(if (featured) 184.dp else 118.dp))
         Column(Modifier.padding(16.dp)) {
@@ -298,7 +312,7 @@ fun PoiSettingRow(
         Box(
             modifier = Modifier
                 .size(42.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
@@ -338,13 +352,26 @@ private fun formatDistance(distanceKm: Double): String = when {
     else -> "${"%.1f".format(distanceKm)} km"
 }
 
-private fun artworkColors(key: String): List<Color> = when (key) {
-    "festival" -> listOf(Color(0xFFF16F54), Color(0xFFF4B942))
-    "concert" -> listOf(Color(0xFF472A79), Color(0xFFB34D8C))
-    "sale" -> listOf(Color(0xFFCB365D), Color(0xFFF28D52))
-    "community" -> listOf(Color(0xFF147A62), Color(0xFF4AA89A))
-    "sports" -> listOf(Color(0xFF18599B), Color(0xFF22A3B8))
-    "workshop" -> listOf(Color(0xFF99633A), Color(0xFFD0925D))
-    "private" -> listOf(Color(0xFF6D526F), Color(0xFFA97982))
-    else -> listOf(PoiAqua, PoiCoral)
+@Composable
+private fun artworkColors(key: String): List<Color> {
+    val classic = when (key) {
+        "festival" -> listOf(Color(0xFFF16F54), Color(0xFFF4B942))
+        "concert" -> listOf(Color(0xFF472A79), Color(0xFFB34D8C))
+        "sale" -> listOf(Color(0xFFCB365D), Color(0xFFF28D52))
+        "community" -> listOf(Color(0xFF147A62), Color(0xFF4AA89A))
+        "sports" -> listOf(Color(0xFF18599B), Color(0xFF22A3B8))
+        "workshop" -> listOf(Color(0xFF99633A), Color(0xFFD0925D))
+        "private" -> listOf(Color(0xFF6D526F), Color(0xFFA97982))
+        else -> listOf(PoiAqua, PoiCoral)
+    }
+    return when (LocalPoiVisualTheme.current) {
+        com.poi.core.model.PoiVisualTheme.CLASSIC -> classic
+        com.poi.core.model.PoiVisualTheme.PULSE ->
+            listOf(Color(0xFF26342B), MaterialTheme.colorScheme.tertiary)
+        com.poi.core.model.PoiVisualTheme.RETRO -> when (key) {
+            "festival", "sale" -> listOf(Color(0xFFB64C29), Color(0xFFE6B83D))
+            "concert", "private" -> listOf(Color(0xFF2F6974), Color(0xFFB64C29))
+            else -> listOf(Color(0xFFE6B83D), Color(0xFF2F6974))
+        }
+    }
 }

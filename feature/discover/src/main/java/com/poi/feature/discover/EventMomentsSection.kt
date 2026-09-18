@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
@@ -134,7 +133,7 @@ internal fun EventMomentsSection(
         )
 
         Card(
-            shape = RoundedCornerShape(22.dp),
+            shape = MaterialTheme.shapes.large,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         ) {
             Row(
@@ -142,7 +141,7 @@ internal fun EventMomentsSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    Modifier.size(48.dp).clip(RoundedCornerShape(16.dp))
+                    Modifier.size(48.dp).clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -182,7 +181,7 @@ internal fun EventMomentsSection(
         }
 
         if (moments.isEmpty()) {
-            Card(shape = RoundedCornerShape(22.dp)) {
+            Card(shape = MaterialTheme.shapes.large) {
                 Column(
                     Modifier.fillMaxWidth().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -267,7 +266,7 @@ internal fun EventMomentsSection(
 
     expandedMoment?.let { moment ->
         Dialog(onDismissRequest = { expandedMoment = null }) {
-            Surface(shape = RoundedCornerShape(24.dp), color = Color.Black) {
+            Surface(shape = MaterialTheme.shapes.extraLarge, color = Color.Black) {
                 AsyncImage(
                     model = moment.imageUrl,
                     contentDescription = moment.caption.ifBlank { "Event moment" },
@@ -312,7 +311,7 @@ private fun MomentCard(
     onViewed: () -> Unit,
 ) {
     LaunchedEffect(moment.id) { onViewed() }
-    Card(shape = RoundedCornerShape(24.dp)) {
+    Card(shape = MaterialTheme.shapes.large) {
         Column {
             Row(
                 Modifier.fillMaxWidth().padding(14.dp),
@@ -438,7 +437,7 @@ private fun CommentsDialog(
 ) {
     var body by remember(moment.id) { mutableStateOf("") }
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surface) {
+        Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxWidth().padding(18.dp)) {
                 Text("Comments", style = MaterialTheme.typography.titleLarge)
                 Text(

@@ -43,6 +43,15 @@ enum class ThemeMode(val label: String) {
     DARK("Dark"),
 }
 
+enum class PoiVisualTheme(
+    val label: String,
+    val description: String,
+) {
+    CLASSIC("Classic", "The clean, familiar Poi experience"),
+    PULSE("Poi Pulse Lab", "Bold, energetic and youth-focused"),
+    RETRO("Poi Retro Lab", "Warm geometric colour and character"),
+}
+
 enum class AuthProvider(val label: String) {
     GOOGLE("Google"),
     EMAIL("Email"),
@@ -135,6 +144,7 @@ data class UserProfile(
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.LIGHT,
+    val visualTheme: PoiVisualTheme = PoiVisualTheme.CLASSIC,
     val discoveryRadiusKm: Int? = 25,
     val defaultCheckInVisibility: CheckInVisibility = CheckInVisibility.FRIENDS,
     val showPlansToFriends: Boolean = true,

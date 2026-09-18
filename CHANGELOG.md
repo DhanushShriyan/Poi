@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — local calendar
+## Unreleased — themes and local calendar
+
+- Added Classic, Poi Pulse Lab, and Poi Retro Lab as production app-wide styles.
+- Added a clean Profile appearance selector for guests and signed-in users, with Classic as the default.
+- Persisted the chosen app style locally and retained light/dark appearance controls for every style.
 
 - Added a subtle January 2026 local-calendar entry point to Discover.
 - Added a dot-based month overview with progressive disclosure for detailed observances.

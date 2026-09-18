@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -180,7 +179,7 @@ private fun AdminMetric(icon: ImageVector, value: String, label: String, modifie
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(Modifier.padding(14.dp)) {
             Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -195,7 +194,7 @@ private fun AdminMetric(icon: ImageVector, value: String, label: String, modifie
 private fun ReportCard(event: Event, report: EventReport, onReview: () -> Unit, onRestore: () -> Unit) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(event.title, fontWeight = FontWeight.SemiBold)
@@ -218,11 +217,11 @@ private fun AdminEventRow(event: Event, onEdit: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(22.dp),
+        shape = MaterialTheme.shapes.large,
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(48.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(15.dp)),
+                Modifier.size(48.dp).background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(event.category.symbol, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
