@@ -104,4 +104,10 @@ class PosterParserTest {
         assertEquals("GURUPURA KAMBALA", result.lines().first())
         assertFalse(result.contains("xx#"))
     }
+    @Test fun layoutPreservesDateListConnectors() {
+        val hocr = """<span class='ocr_line' title='bbox 0 0 300 25'><span class='ocrx_word' title='x_wconf 90'>Apr</span><span class='ocrx_word' title='x_wconf 90'>04</span><span class='ocrx_word' title='x_wconf 20'>&amp;</span><span class='ocrx_word' title='x_wconf 90'>05</span></span>"""
+        val text = PosterOcrLayout.orderedText(hocr, "")
+        assertEquals("Apr 04 & 05", text)
+        assertEquals(listOf(4, 5), PosterParser.parse(text).dateSuggestions.map { it.day })
+    }
 }

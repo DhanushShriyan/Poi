@@ -15,7 +15,8 @@ internal object PosterOcrLayout {
                 val score = confidence.find(word.value)?.groupValues?.get(1)?.toIntOrNull() ?: 0
                 val value = word.groupValues[1].replace(Regex("<[^>]+>"), "")
                     .replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
-                if (score < 35 || value.none(Char::isLetterOrDigit)) null else value to score
+                val connector = value.trim() in setOf("&", "-", "–", ",", ":")
+                if (!connector && (score < 35 || value.none(Char::isLetterOrDigit))) null else value to score
             }.toList()
             if (recognized.isEmpty()) null else Line(recognized.joinToString(" ") { it.first }, bounds[4].toInt() - bounds[2].toInt(), recognized.sumOf { it.second } / recognized.size)
         }
