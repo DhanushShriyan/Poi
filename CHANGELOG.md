@@ -2,6 +2,9 @@
 
 ## Unreleased — themes and local calendar
 
+- Added an offline Kannada/English/Hindi neural poster reader with editable event drafts, language selection, rotation, low-quality warnings, cancellation and bounded scanning. No image upload or per-scan fee.
+- Replaced placeholder event scheduling with exact start/end date and time pickers. Uncertain dates, years, times and duration require review before publishing.
+
 - Added private, event-scoped shared expense groups for accepted friends.
 - Added multiple payers and equal, exact, percentage, or share-based splits with paise-safe totals.
 - Added live balances, simplified settlement suggestions, UPI handoff, recipient-confirmed payments, receipts, comments, search, category totals, activity history, and CSV sharing.

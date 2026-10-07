@@ -1,6 +1,8 @@
 package com.poi.feature.create
 
 import android.Manifest
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -54,10 +57,11 @@ import com.poi.core.location.LocationRepository
 import com.poi.core.model.EventCategory
 import com.poi.core.model.EventVisibility
 import com.poi.core.model.NewEvent
+import com.poi.core.poster.eventTimestamp
+import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
-
-private data class DateChoice(val label: String, val dayOffset: Int)
 
 @Composable
 fun CreateEventScreen(
@@ -67,14 +71,16 @@ fun CreateEventScreen(
     onCreated: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var title by remember { mutableStateOf("") }
-    var summary by remember { mutableStateOf("") }
-    var venue by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
+    var title by rememberSaveable { mutableStateOf("") }
+    var summary by rememberSaveable { mutableStateOf("") }
+    var venue by rememberSaveable { mutableStateOf("") }
+    var address by rememberSaveable { mutableStateOf("") }
     var category by remember { mutableStateOf(EventCategory.FESTIVAL) }
     var visibility by remember { mutableStateOf(EventVisibility.PUBLIC) }
-    val dates = remember { listOf(DateChoice("Tomorrow", 1), DateChoice("This weekend", 3), DateChoice("Next week", 7)) }
-    var dateChoice by remember { mutableStateOf(dates.first()) }
+    var startDate by rememberSaveable { mutableStateOf("") }
+    var startTime by rememberSaveable { mutableStateOf("") }
+    var endDate by rememberSaveable { mutableStateOf("") }
+    var endTime by rememberSaveable { mutableStateOf("") }
     var accepted by remember { mutableStateOf(false) }
     var showErrors by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -112,7 +118,10 @@ fun CreateEventScreen(
             )
         }
     }
-    val valid = title.isNotBlank() && summary.isNotBlank() && venue.isNotBlank() && address.isNotBlank() && accepted
+    val startsAt = eventTimestamp(startDate, startTime)
+    val endsAt = eventTimestamp(endDate, endTime)
+    val validSchedule = startsAt != null && endsAt != null && endsAt > startsAt
+    val valid = title.isNotBlank() && summary.isNotBlank() && venue.isNotBlank() && address.isNotBlank() && accepted && validSchedule
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -129,21 +138,12 @@ fun CreateEventScreen(
         }
 
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                shape = MaterialTheme.shapes.large,
-            ) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.padding(6.dp))
-                    Column {
-                        Text("Smart event creation", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Enter the essentials now. Poster scanning arrives in a later release.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
+            PosterImportCard(enabled = !saving) { draft ->
+                title = draft.title; summary = draft.summary; venue = draft.venue; address = draft.address
+                category = draft.category
+                startDate = draft.date.orEmpty(); startTime = draft.time.orEmpty()
+                endDate = draft.endDate.orEmpty(); endTime = draft.endTime.orEmpty()
+                accepted = false; showErrors = false; publishError = null; attachCoordinates = false
             }
         }
 
@@ -187,19 +187,14 @@ fun CreateEventScreen(
         item {
             PoiSectionHeader("When")
             Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(dates) { item ->
-                    FilterChip(
-                        selected = dateChoice == item,
-                        onClick = { dateChoice = item },
-                        leadingIcon = { Icon(Icons.Default.CalendarMonth, null) },
-                        label = { Text(item.label) },
-                    )
-                }
-            }
+            EventDateTimeField("Start date", startDate, true, { startDate = it })
+            EventDateTimeField("Start time", startTime, false, { startTime = it })
+            EventDateTimeField("End date", endDate, true, { endDate = it })
+            EventDateTimeField("End time", endTime, false, { endTime = it })
             Spacer(Modifier.height(6.dp))
             Text(
-                "The test event uses a four-hour duration. Exact date and time pickers will be enabled with the production calendar flow.",
+                if (showErrors && !validSchedule) "Choose valid start and end details. End must be after start."
+                else "Confirm dates and times against the poster. Missing years and durations are never filled automatically.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -318,7 +313,7 @@ fun CreateEventScreen(
                     }
                     saving = true
                     publishError = null
-                    val starts = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(dateChoice.dayOffset.toLong())
+                    val starts = checkNotNull(startsAt)
                     scope.launch {
                         runCatching {
                             repository.createEvent(
@@ -327,7 +322,7 @@ fun CreateEventScreen(
                                     summary = summary,
                                     category = category,
                                     startsAtMillis = starts,
-                                    endsAtMillis = starts + TimeUnit.HOURS.toMillis(4),
+                                    endsAtMillis = checkNotNull(endsAt),
                                     venue = venue,
                                     address = address,
                                     visibility = visibility,
@@ -367,6 +362,30 @@ fun CreateEventScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EventDateTimeField(label: String, value: String, date: Boolean, onValue: (String) -> Unit) {
+    val context = LocalContext.current
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = {
+            if (date) {
+                val initial = runCatching { LocalDate.parse(value) }.getOrElse { LocalDate.now() }
+                DatePickerDialog(context, { _, year, month, day -> onValue(LocalDate.of(year, month + 1, day).toString()) },
+                    initial.year, initial.monthValue - 1, initial.dayOfMonth).show()
+            } else {
+                val initial = runCatching { LocalTime.parse(value) }.getOrElse { LocalTime.of(9, 0) }
+                TimePickerDialog(context, { _, hour, minute -> onValue(LocalTime.of(hour, minute).toString()) },
+                    initial.hour, initial.minute, true).show()
+            }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Text(label, style = MaterialTheme.typography.labelMedium)
+            Text(value.ifBlank { "Choose ${if (date) "date" else "time"}" }, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

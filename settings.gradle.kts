@@ -21,6 +21,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://jitpack.io")
+            content { includeGroup("cz.adaptech.tesseract4android") }
+        }
     }
 }
 
@@ -29,6 +33,7 @@ rootProject.name = "Poi"
 include(
     ":app",
     ":core:model",
+    ":core:poster",
     ":core:auth",
     ":core:cloud",
     ":core:data",
