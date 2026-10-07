@@ -59,10 +59,17 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
     var weak by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var applied by remember { mutableStateOf(false) }
+    var confirmedYear by remember { mutableStateOf("") }
+    var chosenDate by remember { mutableStateOf<String?>(null) }
+    var chosenEndDate by remember { mutableStateOf<String?>(null) }
+    var chosenTime by remember { mutableStateOf<String?>(null) }
+    val chosenYear = confirmedYear.toIntOrNull()?.takeIf { confirmedYear.length == 4 && it in 1900..2199 }
     val draft = remember(rawText) { rawText?.let(PosterParser::parse) }
+    fun resetChoices() { chosenDate = null; chosenEndDate = null; chosenTime = null; confirmedYear = "" }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             image = uri; rotation = 0; rawText = null; error = null; applied = false
+            resetChoices()
         }
     }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -86,7 +93,7 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
                 Row {
                     Button(enabled = enabled && !scanning, onClick = {
                         job = scope.launch {
-                            scanning = true; error = null; rawText = null; applied = false
+                            scanning = true; error = null; rawText = null; applied = false; resetChoices()
                             try {
                                 val result = reader.read(uri, language, rotation)
                                 rawText = result.draft.sourceText; weak = result.weakRecognition
@@ -113,12 +120,45 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
                 Text(if (applied) "Draft added below" else "Suggested draft", style = MaterialTheme.typography.titleMedium)
                 Text(result.title.ifBlank { "Event name needs your input" })
                 Text("${result.date ?: "Date needs review"} · ${result.time ?: "Time needs review"}", style = MaterialTheme.typography.bodyMedium)
+                if (result.dateSuggestions.isNotEmpty()) {
+                    Text(if (result.continuousDateRange) "Detected date range — confirm to fill the form" else "Detected dates — choose this event's occurrence", style = MaterialTheme.typography.bodyMedium)
+                    if (result.dateSuggestions.any { it.year == null }) {
+                        OutlinedTextField(confirmedYear, onValueChange = {
+                            confirmedYear = it.filter(Char::isDigit).take(4); chosenDate = null; chosenEndDate = null; applied = false
+                        }, label = { Text("Confirm the year (not printed on poster)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextButton(onClick = { confirmedYear = java.time.LocalDate.now().year.toString(); chosenDate = null; chosenEndDate = null; applied = false }) {
+                            Text("Use ${java.time.LocalDate.now().year} — only if correct")
+                        }
+                    }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(result.dateSuggestions) { suggestion ->
+                            val resolved = suggestion.resolve(suggestion.year ?: chosenYear)
+                            FilterChip(selected = resolved != null && chosenDate == resolved, enabled = enabled && resolved != null,
+                                onClick = { chosenDate = resolved; chosenEndDate = null; applied = false }, label = { Text(suggestion.label) })
+                        }
+                    }
+                    if (result.continuousDateRange) {
+                        val resolvedDates = result.dateSuggestions.mapNotNull { it.resolve(it.year ?: chosenYear) }.sorted()
+                        TextButton(enabled = enabled && resolvedDates.size == result.dateSuggestions.size && resolvedDates.size > 1, onClick = {
+                            chosenDate = resolvedDates.first(); chosenEndDate = resolvedDates.last(); applied = false
+                        }) { Text("Use first → last day as a continuous event") }
+                    }
+                    chosenDate?.let { Text("Selected start: $it${chosenEndDate?.let { end -> " · End: $end" }.orEmpty()}") }
+                }
+                if (result.timeSuggestions.size > 1) {
+                    Text("Multiple shows/times — choose a start time")
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(result.timeSuggestions) { option ->
+                            FilterChip(selected = chosenTime == option, enabled = enabled, onClick = { chosenTime = option; applied = false }, label = { Text(option) })
+                        }
+                    }
+                }
                 if (weak) Text("Some text was difficult to read. Compare every field with the poster.", color = MaterialTheme.colorScheme.error)
                 Text("Names and places stay in the poster's original language. No translation or verification is claimed.", style = MaterialTheme.typography.bodySmall)
                 result.warnings.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
                 TextButton(onClick = { showText = !showText }) { Text(if (showText) "Hide recognized text" else "View / correct recognized text") }
                 if (showText) {
-                    OutlinedTextField(rawText.orEmpty(), onValueChange = { rawText = it.take(20_000); applied = false },
+                    OutlinedTextField(rawText.orEmpty(), onValueChange = { rawText = it.take(20_000); applied = false; resetChoices() },
                         modifier = Modifier.fillMaxWidth(), label = { Text("Recognized text") }, minLines = 3, maxLines = 8)
                     TextButton(onClick = {
                         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
@@ -127,7 +167,9 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
                         }, "Share scan feedback"))
                     }) { Text("Share text for feedback") }
                 }
-                Button(enabled = enabled, onClick = { onDraft(result); applied = true }) { Text("Use this draft") }
+                Button(enabled = enabled, onClick = {
+                    onDraft(result.copy(date = chosenDate ?: result.date, endDate = chosenEndDate ?: result.endDate, time = chosenTime ?: result.time)); applied = true
+                }) { Text("Use this draft") }
             }
             Text("Offline reader · no scan fees · no image upload. The poster itself is not attached to the published event.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

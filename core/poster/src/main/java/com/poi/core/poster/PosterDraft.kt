@@ -24,7 +24,17 @@ data class PosterDraft(
     val endDate: String?,
     val endTime: String?,
     val warnings: List<String>,
+    val dateSuggestions: List<PosterDateSuggestion> = emptyList(),
+    val timeSuggestions: List<String> = emptyList(),
+    val continuousDateRange: Boolean = false,
 )
+
+data class PosterDateSuggestion(val month: Int, val day: Int, val year: Int?) {
+    fun resolve(confirmedYear: Int? = year): String? = runCatching {
+        LocalDate.of(confirmedYear ?: error("Confirm the year"), month, day).toString()
+    }.getOrNull()
+    val label: String get() = "%02d/%02d%s".format(day, month, year?.let { "/$it" }.orEmpty())
+}
 
 data class PosterScan(val draft: PosterDraft, val weakRecognition: Boolean)
 

@@ -6,6 +6,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.media.ExifInterface
 import android.net.Uri
 import com.googlecode.tesseract.android.TessBaseAPI
@@ -45,7 +48,7 @@ class OnDevicePosterReader(context: Context) {
                 }
             }
             val bitmap = decode(uri, rotation)
-            val engine = TessBaseAPI()
+            var engine = TessBaseAPI()
             try {
                 check(engine.init(dataRoot.absolutePath, language.models, TessBaseAPI.OEM_LSTM_ONLY)) {
                     "The language reader could not start. Please retry."
@@ -55,13 +58,29 @@ class OnDevicePosterReader(context: Context) {
                 val scanStarted = android.os.SystemClock.elapsedRealtime()
                 var (text, confidence) = recognize(engine, 60_000)
                 currentCoroutineContext().ensureActive()
-                if (text.count(Char::isLetterOrDigit) < 30 || confidence < 40) {
-                    engine.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO)
+                if (language == PosterLanguage.AUTO || text.count(Char::isLetterOrDigit) < 30 || confidence < 40) {
+                    // A Latin-only pass avoids competing scripts corrupting English summary headers.
+                    if (language == PosterLanguage.AUTO) {
+                        engine.recycle()
+                        engine = TessBaseAPI()
+                        check(engine.init(dataRoot.absolutePath, "eng", TessBaseAPI.OEM_LSTM_ONLY)) { "The English reader could not start." }
+                    }
+                    engine.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT)
                     engine.setImage(bitmap)
                     val remaining = 60_000 - (android.os.SystemClock.elapsedRealtime() - scanStarted)
-                    val (alternative, alternativeConfidence) = recognize(engine, remaining.coerceAtLeast(1))
-                    if (alternative.count(Char::isLetterOrDigit) > text.count(Char::isLetterOrDigit) && alternativeConfidence >= confidence - 5) {
-                        text = alternative; confidence = alternativeConfidence
+                    if (remaining > 5_000) {
+                        val alternative = runCatching { recognize(engine, remaining) }.getOrElse {
+                            currentCoroutineContext().ensureActive()
+                            if (text.count(Char::isLetterOrDigit) < 8) throw it
+                            "" to 0
+                        }
+                        val englishHeader = Regex("kambala|concert|fan park|circus|festival|workshop", RegexOption.IGNORE_CASE).containsMatchIn(alternative.first)
+                        if (language == PosterLanguage.AUTO && alternative.second >= 45 && englishHeader) {
+                            text = (alternative.first.lines() + text.lines()).distinct().joinToString("\n")
+                            confidence = maxOf(confidence, alternative.second)
+                        } else if (language != PosterLanguage.AUTO && alternative.first.count(Char::isLetterOrDigit) > text.count(Char::isLetterOrDigit) && alternative.second >= confidence - 5) {
+                            text = alternative.first; confidence = alternative.second
+                        }
                     }
                 }
                 currentCoroutineContext().ensureActive()
@@ -89,10 +108,10 @@ class OnDevicePosterReader(context: Context) {
         }
         try {
             // hOCR starts interruptible recognition; UTF8 then reads the existing result.
-            engine.getHOCRText(0)
+            val hocr = engine.getHOCRText(0).orEmpty()
             currentCoroutineContext().ensureActive()
             check(!timedOut.get()) { "Reading took too long. Crop the poster or choose a specific language, then retry." }
-            engine.getUTF8Text().orEmpty() to engine.meanConfidence()
+            PosterOcrLayout.orderedText(hocr, engine.getUTF8Text().orEmpty()) to engine.meanConfidence()
         } finally {
             finished.set(true)
             withContext(NonCancellable) { watchdog.cancelAndJoin() }
@@ -128,9 +147,28 @@ class OnDevicePosterReader(context: Context) {
         val oriented = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
         if (oriented !== decoded) decoded.recycle()
         // Flatten transparent posters on white; retain colour for the OCR thresholding engine.
-        val output = Bitmap.createBitmap(oriented.width, oriented.height, Bitmap.Config.ARGB_8888)
-        Canvas(output).apply { drawColor(Color.WHITE); drawBitmap(oriented, 0f, 0f, null) }
-        oriented.recycle()
+        val scale = (1600f / maxOf(oriented.width, oriented.height)).coerceAtLeast(1f)
+        val sized = if (scale > 1f) Bitmap.createScaledBitmap(oriented, (oriented.width * scale).toInt(), (oriented.height * scale).toInt(), true) else oriented
+        if (sized !== oriented) oriented.recycle()
+        // Normalize dark/gold and bright-colour posters to high-contrast grayscale.
+        var luminance = 0L; var samples = 0
+        for (y in 0 until sized.height step 20) for (x in 0 until sized.width step 20) {
+            val pixel = sized.getPixel(x, y)
+            luminance += (Color.red(pixel) * 299 + Color.green(pixel) * 587 + Color.blue(pixel) * 114) / 1000
+            samples++
+        }
+        val dark = samples > 0 && luminance / samples < 110
+        val contrast = if (dark) -1.4f else 1.4f
+        val offset = if (dark) 307f else -51f
+        val matrixColour = ColorMatrix(floatArrayOf(
+            .299f * contrast, .587f * contrast, .114f * contrast, 0f, offset,
+            .299f * contrast, .587f * contrast, .114f * contrast, 0f, offset,
+            .299f * contrast, .587f * contrast, .114f * contrast, 0f, offset,
+            0f, 0f, 0f, 1f, 0f,
+        ))
+        val output = Bitmap.createBitmap(sized.width, sized.height, Bitmap.Config.ARGB_8888)
+        Canvas(output).apply { drawColor(Color.WHITE); drawBitmap(sized, 0f, 0f, Paint().apply { colorFilter = ColorMatrixColorFilter(matrixColour) }) }
+        sized.recycle()
         return output
     }
 

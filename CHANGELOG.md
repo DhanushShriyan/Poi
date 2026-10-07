@@ -1,5 +1,11 @@
 # Changelog
 
+## Poster reader field-test improvements
+
+- Prefer layout-aware titles and filter low-confidence OCR words; normalize small/dark poster images and use an English-header pass in automatic mode.
+- Suggest unlabelled footer venues, dates without years, selected show dates and multiple start times. Users explicitly confirm years, occurrences and ranges before applying a draft.
+- Add parser regression cases based on six user-supplied local poster examples; preserve historical dates and never infer show durations.
+
 ## Unreleased — themes and local calendar
 
 - Added an offline Kannada/English/Hindi neural poster reader with editable event drafts, language selection, rotation, low-quality warnings, cancellation and bounded scanning. No image upload or per-scan fee.
