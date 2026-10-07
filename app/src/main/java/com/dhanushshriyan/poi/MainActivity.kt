@@ -42,6 +42,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.poi.core.auth.AuthRepository
 import com.poi.core.data.EventRepository
+import com.poi.core.data.ExpenseRepository
 import com.poi.core.data.MomentRepository
 import com.poi.core.data.SocialRepository
 import com.poi.core.designsystem.PoiTheme
@@ -58,6 +59,7 @@ import com.poi.feature.auth.SignInScreen
 import com.poi.feature.create.CreateEventScreen
 import com.poi.feature.discover.DiscoverScreen
 import com.poi.feature.discover.EventDetailScreen
+import com.poi.feature.expenses.EventExpensesScreen
 import com.poi.feature.localcalendar.LocalCalendarScreen
 import com.poi.feature.plans.PlansScreen
 import com.poi.feature.profile.ProfileScreen
@@ -81,6 +83,7 @@ class MainActivity : ComponentActivity() {
                 PoiApp(
                     application.eventRepository,
                     application.authRepository,
+                    application.expenseRepository,
                     application.momentRepository,
                     application.locationRepository,
                     application.socialRepository,
@@ -105,6 +108,7 @@ private object Routes {
     const val People = "people"
     const val Profile = "profile"
     const val Event = "event/{eventId}"
+    const val Expenses = "expenses/{eventId}"
     const val LocalCalendar = "local-calendar"
     const val Settings = "settings"
     const val Safety = "safety"
@@ -115,6 +119,7 @@ private object Routes {
     const val AdminEdit = "admin/event/{eventId}"
 
     fun event(eventId: String) = "event/$eventId"
+    fun expenses(eventId: String) = "expenses/$eventId"
     fun adminEdit(eventId: String) = "admin/event/$eventId"
 }
 
@@ -138,6 +143,7 @@ private val topDestinations = listOf(
 private fun PoiApp(
     repository: EventRepository,
     authRepository: AuthRepository,
+    expenseRepository: ExpenseRepository,
     momentRepository: MomentRepository,
     locationRepository: LocationRepository,
     socialRepository: SocialRepository,
@@ -278,7 +284,31 @@ private fun PoiApp(
                     isAuthenticated = session.isAuthenticated,
                     onSignIn = signIn,
                     onBack = { navController.popBackStack() },
+                    onExpenses = { navController.navigate(Routes.expenses(it)) },
                 )
+            }
+            composable(
+                route = Routes.Expenses,
+                arguments = listOf(navArgument("eventId") { type = NavType.StringType }),
+            ) { entry ->
+                val eventId = entry.arguments?.getString("eventId").orEmpty()
+                val user = session.user
+                if (user != null) {
+                    EventExpensesScreen(
+                        eventId = eventId,
+                        eventTitle = events.firstOrNull { it.id == eventId }?.title ?: "Event",
+                        currentUserId = user.id,
+                        repository = expenseRepository,
+                        socialRepository = socialRepository,
+                        onBack = { navController.popBackStack() },
+                    )
+                } else {
+                    GuestGateScreen(
+                        title = "Split the event, not the friendship",
+                        message = "Sign in to create a private expense group for this event.",
+                        onSignIn = signIn,
+                    )
+                }
             }
             composable(Routes.SignIn) {
                 SignInScreen(

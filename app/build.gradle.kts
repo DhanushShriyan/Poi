@@ -161,6 +161,7 @@ dependencies {
     implementation(project(":feature:social"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:admin"))
+    implementation(project(":feature:expenses"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)

@@ -2,6 +2,11 @@
 
 ## Unreleased — themes and local calendar
 
+- Added private, event-scoped shared expense groups for accepted friends.
+- Added multiple payers and equal, exact, percentage, or share-based splits with paise-safe totals.
+- Added live balances, simplified settlement suggestions, UPI handoff, recipient-confirmed payments, receipts, comments, search, category totals, activity history, and CSV sharing.
+- Protected expense data and receipt images with server-side membership rules; Poi records settlements but never holds money or connects to bank accounts.
+
 - Migrated production accounts and event data to the permanent Supabase project.
 - Restored email sign-up and sign-in with clear validation and user-friendly recovery errors.
 - Added live starter events plus an offline event fallback so Discover remains useful during outages.

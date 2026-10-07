@@ -8,12 +8,15 @@ import com.poi.core.auth.SupabaseAuthRepository
 import com.poi.core.cloud.PoiCloudClient
 import com.poi.core.cloud.PoiCloudConfig
 import com.poi.core.data.EventRepository
+import com.poi.core.data.ExpenseRepository
 import com.poi.core.data.LocalEventRepository
+import com.poi.core.data.LocalExpenseRepository
 import com.poi.core.data.LocalMomentRepository
 import com.poi.core.data.LocalSocialRepository
 import com.poi.core.data.MomentRepository
 import com.poi.core.data.SocialRepository
 import com.poi.core.data.SupabaseEventRepository
+import com.poi.core.data.SupabaseExpenseRepository
 import com.poi.core.data.SupabaseMomentRepository
 import com.poi.core.data.SupabaseSocialRepository
 import com.poi.core.location.AndroidLocationRepository
@@ -53,6 +56,12 @@ class PoiApplication : Application() {
         cloudClient?.let { cloud ->
             SupabaseMomentRepository(cloud, authRepository)
         } ?: LocalMomentRepository()
+    }
+
+    val expenseRepository: ExpenseRepository by lazy {
+        cloudClient?.let { cloud ->
+            SupabaseExpenseRepository(cloud, authRepository)
+        } ?: LocalExpenseRepository(authRepository)
     }
 
     val socialRepository: SocialRepository by lazy {

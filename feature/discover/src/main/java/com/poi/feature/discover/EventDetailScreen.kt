@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Flag
@@ -97,6 +98,7 @@ fun EventDetailScreen(
     isAuthenticated: Boolean,
     onSignIn: () -> Unit,
     onBack: () -> Unit,
+    onExpenses: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val events by repository.events.collectAsStateWithLifecycle()
@@ -407,6 +409,47 @@ fun EventDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text("Invite friends")
+                        }
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        ),
+                        shape = MaterialTheme.shapes.extraLarge,
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.AccountBalanceWallet,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text("Event expenses", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "Private to the friends you invite",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                "Split tickets, travel, food and stays. See balances, attach receipts and record settlements without Poi holding your money.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            FilledTonalButton(
+                                onClick = {
+                                    if (isAuthenticated) onExpenses(event.id) else onSignIn()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(if (isAuthenticated) "Open shared expenses" else "Sign in to split costs")
+                            }
                         }
                     }
 

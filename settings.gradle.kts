@@ -44,4 +44,5 @@ include(
     ":feature:social",
     ":feature:auth",
     ":feature:admin",
+    ":feature:expenses",
 )
