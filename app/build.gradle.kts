@@ -145,6 +145,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:poster"))
     implementation(project(":core:model"))
     implementation(project(":core:cloud"))
     implementation(project(":core:data"))

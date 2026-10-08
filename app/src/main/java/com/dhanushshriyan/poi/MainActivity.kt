@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
                     application.locationRepository,
                     application.socialRepository,
                     application.reminderScheduler,
+                    application.cloudPosterReader,
                 )
                 PoiUpdatePrompt()
             }
@@ -148,6 +149,7 @@ private fun PoiApp(
     locationRepository: LocationRepository,
     socialRepository: SocialRepository,
     reminderScheduler: EventReminderScheduler,
+    cloudPosterReader: com.poi.core.poster.CloudPosterReader?,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -224,6 +226,7 @@ private fun PoiApp(
             composable(Routes.Create) {
                 if (session.isAuthenticated) {
                     CreateEventScreen(
+                        cloudPosterReader = cloudPosterReader,
                         repository = repository,
                         organizerName = profile.displayName,
                         locationRepository = locationRepository,

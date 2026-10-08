@@ -25,6 +25,12 @@ jobs:
           cache: gradle
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate poster draft safety rules
+        run: node --test scripts/test-poster-validation.mjs
+
       - name: Validate signing and cloud secrets
         env:
           POI_KEYSTORE_BASE64: ${{ secrets.POI_KEYSTORE_BASE64 }}

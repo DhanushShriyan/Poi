@@ -1,4 +1,16 @@
-# Poster reader — first field-testing release
+# Poster reader — AI beta and offline fallback
+
+## AI reader (new)
+
+Create → Choose poster → AI reader · beta → agree to processing this image → Read with AI → compare suggested fields and text evidence → select a date/year/show time → Use this draft → edit and confirm all fields → Publish for review.
+
+The app sends an EXIF-corrected, size-bounded JPEG to the authenticated `read-poster` Supabase Edge Function. That function validates the current user through Supabase Auth, reserves a database-enforced quota, and calls Gemini 3.1 Flash Lite with a structured schema. Gemini's API key is stored only in a Supabase secret, not the app or Git. Missing years/times stay unknown. Listed dates remain separate, explicit ranges require confirmation, and no guessed duration or automatic publication is permitted. Stylized original names can still be wrong; always review.
+
+Free-tier beta limits: 5 attempts per signed-in user per UTC day, at least 15 seconds between that user's attempts, 8 global attempts per minute and 100 per UTC day. Failed provider calls consume an attempt to prevent retry abuse. Provider quotas can be lower or change. No paid billing was enabled. If unavailable, manually choose Offline reader or create the event yourself. Anonymous callers cannot use the proxy or reserve quota. Quota records contain only user IDs/timestamps, not poster contents; no image is deliberately stored by Poi. Google free-tier data processing may use submissions to improve products: do not submit private or sensitive images. Cancellation discards results but may not undo a server request already sent.
+
+`scripts/test-poster-validation.mjs` tests backend date/time validation. `scripts/test-cloud-poster.ps1 -AllSamples` makes six real calls on supplied posters with disposable identities and no event publication. Never repeatedly run that live script unnecessarily: it uses quota. `docs/GEMINI_POSTER_PILOT_RESULTS.md` records the earlier playground test and limitations. Backend setup: apply `202610080001_poster_scan_quota.sql`, set `GEMINI_API_KEY` as an Edge Function secret, deploy `read-poster` with legacy gateway JWT verification OFF (the function verifies user tokens itself). Keep quota RPC executable only by service_role. A migration applied in the dashboard must be marked applied before later CLI migration sync.
+
+## Offline reader (unchanged)
 
 Create → Choose poster → choose language if needed → Read poster → compare recognized text → Use this draft → confirm exact start/end, name and location → Publish for review.
 

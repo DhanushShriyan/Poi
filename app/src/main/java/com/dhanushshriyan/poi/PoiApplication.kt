@@ -22,8 +22,17 @@ import com.poi.core.data.SupabaseSocialRepository
 import com.poi.core.location.AndroidLocationRepository
 import com.poi.core.location.LocationRepository
 import com.poi.core.notifications.EventReminderScheduler
+import com.poi.core.poster.CloudPosterReader
+import io.github.jan.supabase.auth.auth
 
 class PoiApplication : Application() {
+    val cloudPosterReader: CloudPosterReader? by lazy {
+        cloudClient?.let { cloud ->
+            CloudPosterReader(applicationContext, BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY) {
+                cloud.supabase.auth.currentSessionOrNull()?.accessToken
+            }
+        }
+    }
     private val cloudClient: PoiCloudClient? by lazy {
         PoiCloudClient.createOrNull(
             PoiCloudConfig(

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -37,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.poi.core.poster.OnDevicePosterReader
+import com.poi.core.poster.CloudPosterReader
 import com.poi.core.poster.PosterDraft
 import com.poi.core.poster.PosterLanguage
 import com.poi.core.poster.PosterParser
@@ -45,7 +47,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) {
+internal fun PosterImportCard(enabled: Boolean, cloudReader: CloudPosterReader? = null, onDraft: (PosterDraft) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val reader = remember { OnDevicePosterReader(context) }
@@ -56,6 +58,10 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
     var job by remember { mutableStateOf<Job?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var rawText by remember { mutableStateOf<String?>(null) }
+    var cloudDraft by remember { mutableStateOf<PosterDraft?>(null) }
+    var useCloud by remember { mutableStateOf(cloudReader != null) }
+    var uploadConsent by remember { mutableStateOf(false) }
+    var cloudResult by remember { mutableStateOf(false) }
     var weak by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var applied by remember { mutableStateOf(false) }
@@ -64,11 +70,12 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
     var chosenEndDate by remember { mutableStateOf<String?>(null) }
     var chosenTime by remember { mutableStateOf<String?>(null) }
     val chosenYear = confirmedYear.toIntOrNull()?.takeIf { confirmedYear.length == 4 && it in 1900..2199 }
-    val draft = remember(rawText) { rawText?.let(PosterParser::parse) }
+    val offlineDraft = remember(rawText) { rawText?.let(PosterParser::parse) }
+    val draft = cloudDraft ?: offlineDraft
     fun resetChoices() { chosenDate = null; chosenEndDate = null; chosenTime = null; confirmedYear = "" }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            image = uri; rotation = 0; rawText = null; error = null; applied = false
+            image = uri; rotation = 0; rawText = null; cloudDraft = null; uploadConsent = false; error = null; applied = false
             resetChoices()
         }
     }
@@ -78,24 +85,41 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
                 Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                 Text("Create from a poster", style = MaterialTheme.typography.titleMedium)
             }
-            Text("Kannada, English and Hindi. Read on your phone, then review before publishing.", style = MaterialTheme.typography.bodyMedium)
+            Text("Kannada, English and Hindi. Turn your poster into a draft, then review before publishing.", style = MaterialTheme.typography.bodyMedium)
             Button(onClick = { picker.launch("image/*") }, enabled = enabled && !scanning) {
                 Text(if (image == null) "Choose poster" else "Choose another poster")
             }
             image?.let { uri ->
                 AsyncImage(uri, "Selected poster", Modifier.fillMaxWidth().height(180.dp).rotate(rotation.toFloat()), contentScale = ContentScale.Fit)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(PosterLanguage.entries) { option ->
-                        FilterChip(selected = language == option, enabled = !scanning && enabled,
-                            onClick = { language = option; rawText = null; applied = false }, label = { Text(option.label) })
+                if (cloudReader != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = useCloud, enabled = !scanning, onClick = { useCloud = true; rawText = null; cloudDraft = null; applied = false }, label = { Text("AI reader · beta") })
+                        FilterChip(selected = !useCloud, enabled = !scanning, onClick = { useCloud = false; rawText = null; cloudDraft = null; applied = false }, label = { Text("Offline reader") })
+                    }
+                }
+                if (useCloud) {
+                    Text("AI reading sends this image through Poi's backend to Google Gemini. Free-tier submissions may be used by Google to improve its products. Do not upload private/sensitive posters. Beta: 5 attempts per person daily; shared free quota also applies.", style = MaterialTheme.typography.bodySmall)
+                    Row {
+                        Checkbox(checked = uploadConsent, enabled = !scanning, onCheckedChange = { uploadConsent = it })
+                        Text("I can share this poster and agree to AI processing.", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (!useCloud) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(PosterLanguage.entries) { option ->
+                            FilterChip(selected = language == option, enabled = !scanning && enabled,
+                                onClick = { language = option; rawText = null; applied = false }, label = { Text(option.label) })
+                        }
                     }
                 }
                 Row {
-                    Button(enabled = enabled && !scanning, onClick = {
+                    Button(enabled = enabled && !scanning && (!useCloud || uploadConsent), onClick = {
                         job = scope.launch {
-                            scanning = true; error = null; rawText = null; applied = false; resetChoices()
+                            scanning = true; error = null; rawText = null; cloudDraft = null; applied = false; resetChoices()
                             try {
-                                val result = reader.read(uri, language, rotation)
+                                val result = if (useCloud && cloudReader != null) cloudReader.read(uri, rotation) else reader.read(uri, language, rotation)
+                                cloudResult = useCloud && cloudReader != null
+                                cloudDraft = if (cloudResult) result.draft else null
                                 rawText = result.draft.sourceText; weak = result.weakRecognition
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
@@ -103,15 +127,15 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
                                 error = failure.message ?: "The poster could not be read. Try another image."
                             } finally { scanning = false }
                         }
-                    }) { Text("Read poster") }
+                    }) { Text(if (useCloud) "Read with AI" else "Read on phone") }
                     TextButton(enabled = !scanning && enabled, onClick = {
-                        rotation = (rotation + 90) % 360; rawText = null; applied = false
+                        rotation = (rotation + 90) % 360; rawText = null; cloudDraft = null; applied = false
                     }) { Text("Rotate 90°") }
                 }
             }
             if (scanning) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
-                Text("Reading on this phone… Large posters may take longer.", style = MaterialTheme.typography.bodySmall)
+                Text(if (useCloud) "AI is reading your poster… This can take up to a minute." else "Reading on this phone… Large posters may take longer.", style = MaterialTheme.typography.bodySmall)
                 // Native recognition is serialised. Cancellation discards its result without publishing.
                 TextButton(onClick = { job?.cancel() }) { Text("Cancel reading") }
             }
@@ -154,11 +178,11 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
                     }
                 }
                 if (weak) Text("Some text was difficult to read. Compare every field with the poster.", color = MaterialTheme.colorScheme.error)
-                Text("Names and places stay in the poster's original language. No translation or verification is claimed.", style = MaterialTheme.typography.bodySmall)
+                Text(if (cloudResult) "AI suggestions are not verified. Check names, dates and places before using the draft." else "Names and places stay in the poster's original language. No translation or verification is claimed.", style = MaterialTheme.typography.bodySmall)
                 result.warnings.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-                TextButton(onClick = { showText = !showText }) { Text(if (showText) "Hide recognized text" else "View / correct recognized text") }
+                TextButton(onClick = { showText = !showText }) { Text(if (showText) "Hide recognized text" else if (cloudResult) "View text evidence" else "View / correct recognized text") }
                 if (showText) {
-                    OutlinedTextField(rawText.orEmpty(), onValueChange = { rawText = it.take(20_000); applied = false; resetChoices() },
+                    OutlinedTextField(rawText.orEmpty(), readOnly = cloudResult, onValueChange = { rawText = it.take(20_000); applied = false; resetChoices() },
                         modifier = Modifier.fillMaxWidth(), label = { Text("Recognized text") }, minLines = 3, maxLines = 8)
                     TextButton(onClick = {
                         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
@@ -171,7 +195,7 @@ internal fun PosterImportCard(enabled: Boolean, onDraft: (PosterDraft) -> Unit) 
                     onDraft(result.copy(date = chosenDate ?: result.date, endDate = chosenEndDate ?: result.endDate, time = chosenTime ?: result.time)); applied = true
                 }) { Text("Use this draft") }
             }
-            Text("Offline reader · no scan fees · no image upload. The poster itself is not attached to the published event.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (useCloud) "AI draft only · nothing is published automatically. You can switch to offline reading anytime." else "Offline reader · no scan fees · no image upload. The poster itself is not attached to the published event.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

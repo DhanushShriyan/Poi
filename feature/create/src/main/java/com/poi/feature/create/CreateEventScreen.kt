@@ -58,6 +58,7 @@ import com.poi.core.model.EventCategory
 import com.poi.core.model.EventVisibility
 import com.poi.core.model.NewEvent
 import com.poi.core.poster.eventTimestamp
+import com.poi.core.poster.CloudPosterReader
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.launch
@@ -70,6 +71,7 @@ fun CreateEventScreen(
     locationRepository: LocationRepository,
     onCreated: (String) -> Unit,
     modifier: Modifier = Modifier,
+    cloudPosterReader: CloudPosterReader? = null,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
     var summary by rememberSaveable { mutableStateOf("") }
@@ -138,7 +140,7 @@ fun CreateEventScreen(
         }
 
         item {
-            PosterImportCard(enabled = !saving) { draft ->
+            PosterImportCard(enabled = !saving, cloudReader = cloudPosterReader) { draft ->
                 title = draft.title; summary = draft.summary; venue = draft.venue; address = draft.address
                 category = draft.category
                 startDate = draft.date.orEmpty(); startTime = draft.time.orEmpty()
