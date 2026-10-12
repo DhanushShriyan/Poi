@@ -20,6 +20,7 @@ interface SocialRepository {
     suspend fun removeFriendship(friendshipId: String)
     suspend fun inviteToEvent(eventId: String, profileId: String)
     suspend fun respondToInvitation(invitationId: String, accept: Boolean)
+    suspend fun createEventJoinLink(eventId: String): String = error("Join links need a live cloud connection.")
 }
 
 fun List<SocialProfile>.searchProfiles(query: String, currentUserId: String?): List<SocialProfile> {

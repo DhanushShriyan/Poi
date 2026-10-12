@@ -34,7 +34,7 @@ jobs:
       - name: Validate trip companion currency calculations
         run: |
           node --check web-companion/dist/app.js
-          node --test web-companion/test/money.test.mjs
+          node --test web-companion/test/*.test.mjs
 
       - name: Validate signing and cloud secrets
         env:

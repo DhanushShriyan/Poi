@@ -13,6 +13,9 @@ import com.poi.core.model.SocialProfile
 import com.poi.core.model.SocialSyncState
 import io.github.jan.supabase.annotations.SupabaseExperimental
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import io.github.jan.supabase.realtime.selectAsFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -158,6 +161,12 @@ class SupabaseSocialRepository(
             ),
         )
         Unit
+    }
+
+    override suspend fun createEventJoinLink(eventId: String): String {
+        requireUserId()
+        val token = cloud.supabase.postgrest.rpc("create_poi_event_join_link", buildJsonObject { put("p_event_id", eventId) }).decodeAs<String>()
+        return "https://poi-trip-companion.dhanushriyan22.chatgpt.site/?event=$eventId#join=$token"
     }
 
     override suspend fun respondToInvitation(invitationId: String, accept: Boolean) =

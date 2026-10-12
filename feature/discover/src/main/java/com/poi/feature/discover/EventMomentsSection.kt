@@ -100,8 +100,6 @@ internal fun EventMomentsSection(
     val moments = allMoments.filter { it.eventId == eventId }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val canContribute = attendanceStatus == AttendanceStatus.HERE ||
-        attendanceStatus == AttendanceStatus.ATTENDED
     var selectedImage by remember { mutableStateOf<SelectedImage?>(null) }
     var uploading by remember { mutableStateOf(false) }
     var readingImage by remember { mutableStateOf(false) }
@@ -132,7 +130,7 @@ internal fun EventMomentsSection(
         PoiSectionHeader("Event moments")
         OutlinedButton(onClick = { scope.launch { runCatching { repository.refresh() }.onSuccess { errorMessage = null }.onFailure { errorMessage = "Photos could not sync. Check your connection and retry." } } }) { Text("Refresh photos") }
         Text(
-            "Photos shared by people who checked in to this event.",
+            "Share your event photos now or after you get home. Check-in is optional.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -158,9 +156,8 @@ internal fun EventMomentsSection(
                     Text(
                         when {
                             !repository.isCloudBacked -> "Moments need the live cloud connection."
-                            !isAuthenticated -> "Sign in and check in before sharing a photo."
-                            canContribute -> "Choose a photo and add an optional caption."
-                            else -> "Tap “I'm here” above before sharing a photo."
+                            !isAuthenticated -> "Sign in before sharing a photo."
+                            else -> "Choose a photo and add an optional caption."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -170,7 +167,6 @@ internal fun EventMomentsSection(
                     onClick = {
                         when {
                             !isAuthenticated -> onSignIn()
-                            !canContribute -> errorMessage = "Check in to this event before adding a moment."
                             else -> picker.launch("image/*")
                         }
                     },
@@ -200,7 +196,7 @@ internal fun EventMomentsSection(
                     Spacer(Modifier.height(10.dp))
                     Text("No moments yet", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "The first checked-in attendee can start this event's story.",
+                        "Start this event's story with your favourite photo.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

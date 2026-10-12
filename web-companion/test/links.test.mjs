@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {eventLink,readEventLink} from '../dist/links.js';
+test('event links select the exact event and preserve join invitation across login',()=>{const id='11111111-1111-4111-8111-111111111111',token='a'.repeat(64);assert.deepEqual(readEventLink(eventLink(id,token)),{eventId:id,token});assert.ok(!eventLink(id,token).includes('?join='));assert.equal(readEventLink('https://example.com/?event=junk#join=junk').eventId,'');assert.throws(()=>eventLink('../secret'));});
+import {payerAllocations} from '../dist/money.js';
+import {calendarFile,eventDetails} from '../dist/events.js';
+import {january} from '../dist/local-calendar.js';
+import {nearbyEvents} from '../dist/geo.js';
+test('calendar matches the reviewed 31-day and 101-observance source',()=>{assert.equal(january.length,31);assert.equal(january.flatMap(d=>d.observances).length,101);assert.ok(january.every(d=>d.observances.every(o=>o.en&&o.kn)));});
+test('radius excludes events without coordinates and leaves any-distance view unchanged',()=>{const events=[{latitude:12,longitude:74},{latitude:14,longitude:76},{latitude:null,longitude:null}];assert.equal(nearbyEvents(events,{latitude:12,longitude:74},25).length,1);assert.equal(nearbyEvents(events,null,25).length,3);});
+test('multiple payers preserve exact allocations and reject wrong totals',()=>{assert.deepEqual(payerAllocations(10001,[{id:'a',value:'60.01'},{id:'b',value:'40'}]),[{user_id:'a',amount_minor:6001},{user_id:'b',amount_minor:4000}]);assert.equal(payerAllocations(12345,[{id:'a',value:''}])[0].amount_minor,12345);assert.throws(()=>payerAllocations(100,[{id:'a',value:'2'}]));});
+test('calendar exports Kannada safely without injected calendar records',()=>{const ics=calendarFile({id:'one',title:'ಕಂಬಳ\nEND:VEVENT',description:'Text',venue:'Venue',address:'City',starts_at_millis:0,ends_at_millis:1000});assert.ok(ics.includes('\\nEND:VEVENT'));assert.equal(ics.split('\r\n').filter(l=>l==='END:VEVENT').length,1);});

@@ -19,3 +19,10 @@ export function balances(members, payments, shares, settlements) {
  shares.forEach(p=>{if(p.user_id in map) map[p.user_id]-=Number(p.amount_minor);});
  settlements.filter(s=>s.status==='confirmed').forEach(s=>{if(s.payer_id in map)map[s.payer_id]+=Number(s.amount_minor);if(s.payee_id in map)map[s.payee_id]-=Number(s.amount_minor);}); return map;
 }
+export function payerAllocations(total,rows){
+ if(!rows.length)throw Error('Select at least one payer.');
+ if(new Set(rows.map(r=>r.id)).size!==rows.length)throw Error('Duplicate payer.');
+ const out=rows.map(r=>({user_id:r.id,amount_minor:rows.length===1&&!String(r.value).trim()?total:moneyMinor(r.value)}));
+ if(out.some(p=>p.amount_minor<=0)||out.reduce((n,p)=>n+p.amount_minor,0)!==total)throw Error('Payer amounts must be positive and add to the expense total.');
+ return out;
+}

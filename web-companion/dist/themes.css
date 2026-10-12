@@ -1,0 +1,13 @@
+:root[data-theme=pulse]{--purple:#e74a85;--mint:#f2e9ff;--bg:#fff6fb;--ink:#26213a;--line:#efdeeb}
+:root[data-theme=retro]{--purple:#b9512b;--mint:#f1daa0;--bg:#f6eed6;--ink:#242820;--line:#77705b}
+:root[data-theme=retro] .card{border-radius:8px;border:1.5px solid var(--line);background:#fff7df}
+:root[data-theme=retro] .hero{background:linear-gradient(90deg,#e7b737 45%,#4b8996 45%,#4b8996 68%,#c36338 68%);border-radius:10px}
+:root[data-mode=dark]{color-scheme:dark;--ink:#f3f3f8;--muted:#b1b6c8;--paper:#202335;--bg:#141623;--line:#383d52;--mint:#25473f}
+:root[data-mode=dark] .card,:root[data-mode=dark] button.quiet,:root[data-mode=dark] nav button,:root[data-mode=dark] input,:root[data-mode=dark] select,:root[data-mode=dark] textarea,:root[data-mode=dark] dialog{background:var(--paper);color:var(--ink);border-color:var(--line)}
+:root[data-mode=dark] .hero{background:linear-gradient(110deg,#292440,#1c3935)}
+:root[data-mode=dark] .hero p:last-child{color:var(--muted)}
+:root[data-mode=dark] #notice:not(:empty){background:#33254b;border-color:#57466d}
+:root[data-mode=dark] .badge{color:#c5e9db}
+details>summary{cursor:pointer;padding:12px 0;line-height:1.5}
+.preserve-lines{white-space:pre-wrap}.event-card{display:flex;flex-direction:column}.event-card button{margin-top:auto}.event-detail{border-top:4px solid var(--purple)}
+:focus-visible{outline:3px solid var(--purple);outline-offset:3px}

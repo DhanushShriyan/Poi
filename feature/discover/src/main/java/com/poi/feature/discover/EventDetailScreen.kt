@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -116,6 +117,9 @@ fun EventDetailScreen(
     val context = LocalContext.current
     var showCheckIn by remember { mutableStateOf(false) }
     var showReport by remember { mutableStateOf(false) }
+    var showShareJoinLink by remember { mutableStateOf(false) }
+    var joinLinkMessage by remember { mutableStateOf<String?>(null) }
+    var creatingJoinLink by remember { mutableStateOf(false) }
     var showInviteFriends by remember { mutableStateOf(false) }
     var inviteMessage by remember { mutableStateOf<String?>(null) }
     var checkInLocation by remember { mutableStateOf<LocationSnapshot?>(null) }
@@ -197,16 +201,26 @@ fun EventDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
+                        if (event.createdByCurrentUser && event.visibility != EventVisibility.PUBLIC) {
+                            joinLinkMessage = null
+                            showShareJoinLink = true
+                        } else {
                         val sendIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(
                                 Intent.EXTRA_TEXT,
-                                "${event.title}\n${formatEventDate(event.startsAtMillis)}\n${event.venue}, ${event.address}",
+                                "${event.title}\n${formatEventDate(event.startsAtMillis)}\n${event.venue}, ${event.address}\nhttps://poi-trip-companion.dhanushriyan22.chatgpt.site/?event=${event.id}",
                             )
                         }
                         context.startActivity(Intent.createChooser(sendIntent, "Share event"))
+                        }
                     }) {
                         Icon(Icons.Default.Share, "Share")
+                    }
+                    if (event.createdByCurrentUser && isAuthenticated) {
+                        IconButton(onClick = {
+                            showShareJoinLink = true
+                        }) { Icon(Icons.Default.Groups, "Create join link") }
                     }
                     IconButton(onClick = { showReport = true }) {
                         Icon(Icons.Default.Flag, "Report event")
@@ -411,6 +425,11 @@ fun EventDetailScreen(
                             Text("Invite friends")
                         }
                     }
+                    if (isAuthenticated && event.createdByCurrentUser && !event.isCancelled) {
+                        OutlinedButton(onClick = { joinLinkMessage = null; showShareJoinLink = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Share guest join link")
+                        }
+                    }
 
                     Spacer(Modifier.height(24.dp))
                     Card(
@@ -502,6 +521,31 @@ fun EventDetailScreen(
                     }
                 }
             },
+        )
+    }
+
+    if (showShareJoinLink) {
+        AlertDialog(
+            onDismissRequest = { if (!creatingJoinLink) showShareJoinLink = false },
+            title = { Text("Share a join link") },
+            text = { Text(joinLinkMessage ?: "Anyone you send this link to can sign in and join this event, including private events. Share only with your intended guests. The link expires in 30 days; creating a new link disables the previous link. Expenses still need a separate group invitation.") },
+            confirmButton = {
+                TextButton(enabled = !creatingJoinLink, onClick = {
+                    creatingJoinLink = true
+                    scope.launch {
+                        runCatching { socialRepository.createEventJoinLink(event.id) }
+                            .onSuccess { url ->
+                                showShareJoinLink = false
+                                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, "Join ${event.title} on Poi\n$url")
+                                }, "Share event join link"))
+                            }.onFailure { joinLinkMessage = it.message ?: "Join link could not be created." }
+                        creatingJoinLink = false
+                    }
+                }) { Text(if (creatingJoinLink) "Creating…" else "Create and share") }
+            },
+            dismissButton = { TextButton(onClick = { showShareJoinLink = false }, enabled = !creatingJoinLink) { Text("Cancel") } },
         )
     }
 

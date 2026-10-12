@@ -1,0 +1,2 @@
+export function distanceKm(a,b){const rad=n=>n*Math.PI/180,dlat=rad(b.latitude-a.latitude),dlon=rad(b.longitude-a.longitude);const h=Math.sin(dlat/2)**2+Math.cos(rad(a.latitude))*Math.cos(rad(b.latitude))*Math.sin(dlon/2)**2;return 6371*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h)));}
+export function nearbyEvents(events,point,radius){if(!point||!radius)return events;return events.filter(e=>Number.isFinite(e.latitude)&&Number.isFinite(e.longitude)&&distanceKm(point,e)<=radius);}
