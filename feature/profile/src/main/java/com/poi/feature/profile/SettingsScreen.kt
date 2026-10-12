@@ -1,5 +1,8 @@
 package com.poi.feature.profile
 
+import android.content.Intent
+import android.net.Uri
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -64,6 +67,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onAccountDeleted: () -> Unit,
     modifier: Modifier = Modifier,
+    onFeedback: () -> Unit = {},
 ) {
     val settings by repository.settings.collectAsStateWithLifecycle()
     val profile by repository.profile.collectAsStateWithLifecycle()
@@ -113,6 +117,12 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 40.dp),
         ) {
+            item { OutlinedButton(onClick = onFeedback, modifier = Modifier.fillMaxWidth()) { Text("Send trip testing feedback") }; Spacer(Modifier.height(16.dp)) }
+            item {
+                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://poi-trip-companion.dhanushriyan22.chatgpt.site"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open iPhone / web companion") }
+                OutlinedButton(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Join our trip on Poi. Use the same Poi account on iPhone or Android: https://poi-trip-companion.dhanushriyan22.chatgpt.site") }, "Share Poi with friends")) }, modifier = Modifier.fillMaxWidth()) { Text("Share the web app with friends") }
+                Spacer(Modifier.height(16.dp))
+            }
             item {
                 PoiSectionHeader("Profile")
                 Spacer(Modifier.height(8.dp))

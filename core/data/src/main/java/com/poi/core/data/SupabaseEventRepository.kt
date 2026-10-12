@@ -78,36 +78,35 @@ class SupabaseEventRepository(
 
     init {
         scope.launch {
-            cloud.supabase.from("events")
-                .selectAsFlow(EventRow::id)
-                .onStart { markLoading() }
-                .retryWhen { cause, attempt ->
-                    markFailure(cause)
-                    delay((attempt + 1).coerceAtMost(6) * 1_000L)
-                    true
-                }
-                .catch { error -> markFailure(error) }
-                .collectLatest { rows ->
-                    eventRows.value = rows
-                    markSuccess()
-                    refreshEvents()
-                    refreshProfileCounts()
-                }
-        }
-        scope.launch {
             authRepository.session.collectLatest { session ->
-                if (!session.isAuthenticated) {
-                    _attendance.value = emptyMap()
-                    _attendanceVerification.value = emptyMap()
-                    _checkInVisibility.value = emptyMap()
-                    reportedIds.clear()
-                    _reportedEvents.value = emptyList()
-                    _profile.value = localPreferences.profile.value
-                } else {
+                // Restart the initial query/subscription under the new account's RLS context.
+                // Never keep the previous member's private data visible during account changes.
+                eventRows.value = emptyList()
+                _attendance.value = emptyMap()
+                _attendanceVerification.value = emptyMap()
+                _checkInVisibility.value = emptyMap()
+                reportedIds.clear()
+                _reportedEvents.value = emptyList()
+                _profile.value = localPreferences.profile.value
+                refreshEvents()
+                if (session.isAuthenticated) {
                     runCatching { refreshMemberData(checkNotNull(session.user?.id)) }
                         .onFailure(::markFailure)
                 }
-                refreshEvents()
+                cloud.supabase.from("events").selectAsFlow(EventRow::id)
+                    .onStart { markLoading() }
+                    .retryWhen { cause, attempt ->
+                        markFailure(cause)
+                        delay((attempt + 1).coerceAtMost(6) * 1_000L)
+                        true
+                    }
+                    .catch { error -> markFailure(error) }
+                    .collectLatest { rows ->
+                        eventRows.value = rows
+                        markSuccess()
+                        refreshEvents()
+                        refreshProfileCounts()
+                    }
             }
         }
     }

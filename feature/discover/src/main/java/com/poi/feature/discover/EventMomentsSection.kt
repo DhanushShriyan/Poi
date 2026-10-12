@@ -3,6 +3,10 @@ package com.poi.feature.discover
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -106,7 +110,7 @@ internal fun EventMomentsSection(
     var expandedMoment by remember { mutableStateOf<EventMoment?>(null) }
     var deleteMoment by remember { mutableStateOf<EventMoment?>(null) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(eventId, isAuthenticated) {
         runCatching { repository.refresh() }
             .onFailure { errorMessage = it.message ?: "Moments could not be refreshed." }
     }
@@ -126,6 +130,7 @@ internal fun EventMomentsSection(
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PoiSectionHeader("Event moments")
+        OutlinedButton(onClick = { scope.launch { runCatching { repository.refresh() }.onSuccess { errorMessage = null }.onFailure { errorMessage = "Photos could not sync. Check your connection and retry." } } }) { Text("Refresh photos") }
         Text(
             "Photos shared by people who checked in to this event.",
             style = MaterialTheme.typography.bodyMedium,
@@ -498,29 +503,37 @@ private data class SelectedImage(val bytes: ByteArray, val mimeType: String)
 private suspend fun Context.readMomentImage(uri: Uri): SelectedImage = withContext(Dispatchers.IO) {
     val rawType = contentResolver.getType(uri)?.lowercase().orEmpty()
     val mimeType = if (rawType == "image/jpg") "image/jpeg" else rawType
-    require(mimeType in supportedImageTypes) { "Choose a JPEG, PNG, or WebP photo." }
-
-    val bytes = contentResolver.openInputStream(uri)?.use { input ->
-        val output = ByteArrayOutputStream()
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        var total = 0
-        while (true) {
-            val read = input.read(buffer)
-            if (read < 0) break
-            total += read
-            require(total <= MAX_IMAGE_BYTES) { "Photos must be 6 MB or smaller." }
-            output.write(buffer, 0, read)
-        }
-        output.toByteArray()
-    } ?: error("Android could not open that photo.")
-
+    require(mimeType in supportedImageTypes || mimeType in setOf("image/heic", "image/heif")) { "Choose a JPEG, PNG, WebP or supported HEIC photo." }
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    require(bounds.outWidth > 0 && bounds.outHeight > 0) { "That file is not a readable photo." }
-    require(bounds.outWidth <= 12_000 && bounds.outHeight <= 12_000) {
-        "This photo's dimensions are too large. Choose a smaller image."
+    contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    require(bounds.outWidth in 1..40_000 && bounds.outHeight in 1..40_000) { "That file is not a readable photo. Try exporting it as JPEG." }
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 2048) sample *= 2
+    val original = contentResolver.openInputStream(uri)?.use {
+        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+    } ?: error("This phone could not decode the photo. Try a JPEG copy.")
+    val orientation = runCatching { contentResolver.openInputStream(uri)?.use { ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, 1) } }.getOrNull()
+    val matrix = Matrix()
+    when (orientation) {
+        2 -> matrix.setScale(-1f, 1f)
+        3 -> matrix.setRotate(180f)
+        4 -> matrix.setScale(1f, -1f)
+        5 -> { matrix.setRotate(90f); matrix.postScale(-1f, 1f) }
+        6 -> matrix.setRotate(90f)
+        7 -> { matrix.setRotate(-90f); matrix.postScale(-1f, 1f) }
+        8 -> matrix.setRotate(-90f)
     }
-    SelectedImage(bytes, mimeType)
+    val oriented = Bitmap.createBitmap(original, 0, 0, original.width, original.height, matrix, true)
+    if (oriented !== original) original.recycle()
+    val flat = Bitmap.createBitmap(oriented.width, oriented.height, Bitmap.Config.ARGB_8888)
+    Canvas(flat).apply { drawColor(android.graphics.Color.WHITE); drawBitmap(oriented, 0f, 0f, null) }
+    oriented.recycle()
+    try {
+        val output = ByteArrayOutputStream()
+        flat.compress(Bitmap.CompressFormat.JPEG, 85, output)
+        require(output.size() <= MAX_IMAGE_BYTES) { "This photo is still too large. Crop it and retry." }
+        SelectedImage(output.toByteArray(), "image/jpeg")
+    } finally { flat.recycle() }
 }
 
 private fun Context.shareMoment(eventTitle: String, moment: EventMoment, url: String) {

@@ -139,15 +139,8 @@ fun CreateEventScreen(
             )
         }
 
-        item {
-            PosterImportCard(enabled = !saving, cloudReader = cloudPosterReader) { draft ->
-                title = draft.title; summary = draft.summary; venue = draft.venue; address = draft.address
-                category = draft.category
-                startDate = draft.date.orEmpty(); startTime = draft.time.orEmpty()
-                endDate = draft.endDate.orEmpty(); endTime = draft.endTime.orEmpty()
-                accepted = false; showErrors = false; publishError = null; attachCoordinates = false
-            }
-        }
+        // Poster import is intentionally hidden for the trip-testing release.
+        // Its standalone module and backend function remain available for a later release.
 
         item {
             PoiSectionHeader("Basic details")

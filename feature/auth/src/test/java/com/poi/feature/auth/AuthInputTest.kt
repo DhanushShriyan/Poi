@@ -5,6 +5,10 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AuthInputTest {
+    @Test fun `existing valid passwords are not subjected to new account rules`() {
+        assertNull(validateEmailAccountInput("", "person@example.com", "abcdef", false))
+        assertEquals("Enter your password.", validateEmailAccountInput("", "person@example.com", "", false))
+    }
     @Test
     fun `new account requires name valid email and strong enough password`() {
         assertEquals(

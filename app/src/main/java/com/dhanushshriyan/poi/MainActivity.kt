@@ -89,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     application.socialRepository,
                     application.reminderScheduler,
                     application.cloudPosterReader,
+                    application.feedbackRepository,
                 )
                 PoiUpdatePrompt()
             }
@@ -112,6 +113,7 @@ private object Routes {
     const val Expenses = "expenses/{eventId}"
     const val LocalCalendar = "local-calendar"
     const val Settings = "settings"
+    const val Feedback = "trip-feedback"
     const val Safety = "safety"
     const val AppUpdates = "app-updates"
     const val SignIn = "sign-in"
@@ -150,6 +152,7 @@ private fun PoiApp(
     socialRepository: SocialRepository,
     reminderScheduler: EventReminderScheduler,
     cloudPosterReader: com.poi.core.poster.CloudPosterReader?,
+    feedbackRepository: com.poi.core.data.TripFeedbackRepository,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -369,12 +372,20 @@ private fun PoiApp(
             composable(Routes.Settings) {
                 if (session.isAuthenticated) {
                     SettingsScreen(
+                        onFeedback = { navController.navigate(Routes.Feedback) },
                         repository = repository,
                         locationRepository = locationRepository,
                         deleteAccount = authRepository::deleteAccount,
                         onBack = { navController.popBackStack() },
                         onAccountDeleted = { navController.navigateTopLevel(Routes.Profile) },
                     )
+                }
+            }
+            composable(Routes.Feedback) {
+                if (session.isAuthenticated) {
+                    com.poi.feature.profile.TripFeedbackScreen(feedbackRepository, BuildConfig.VERSION_NAME) { navController.popBackStack() }
+                } else {
+                    GuestGateScreen(title = "Share your feedback", message = "Sign in to send feedback securely.", onSignIn = signIn)
                 }
             }
             composable(Routes.People) {

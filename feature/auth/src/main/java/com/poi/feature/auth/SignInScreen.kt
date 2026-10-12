@@ -36,6 +36,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.poi.core.auth.AuthRepository
@@ -64,6 +67,7 @@ fun SignInScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
+    var showPassword by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val session by authRepository.session.collectAsStateWithLifecycle()
@@ -77,9 +81,8 @@ fun SignInScreen(
         status = null
         scope.launch {
             block().fold(
-                onSuccess = {
-                    if (authRepository.session.value.isAuthenticated) onSignedIn()
-                },
+                // Session observer owns navigation; a second pop can close the next screen.
+                onSuccess = {},
                 onFailure = { error = friendlyAuthError(it) },
             )
             loading = false
@@ -144,7 +147,7 @@ fun SignInScreen(
                                             status = "Complete Google sign-in in the secure browser window."
                                         },
                                         onFailure = {
-                                            error = it.message ?: "Google sign-in could not be started"
+                                            error = friendlyAuthError(it)
                                         },
                                     )
                                     loading = false
@@ -213,6 +216,8 @@ fun SignInScreen(
                             onValueChange = { email = it.take(120) },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Email address") },
+                            supportingText = { Text("Use your Gmail address or another email account.") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             singleLine = true,
                         )
                         Spacer(Modifier.height(10.dp))
@@ -221,7 +226,9 @@ fun SignInScreen(
                             onValueChange = { password = it.take(80) },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Password") },
-                            visualTransformation = PasswordVisualTransformation(),
+                            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            trailingIcon = { TextButton(onClick = { showPassword = !showPassword }) { Text(if (showPassword) "Hide" else "Show") } },
                             singleLine = true,
                         )
                         Spacer(Modifier.height(16.dp))
@@ -263,7 +270,8 @@ fun SignInScreen(
                             )
                         }
                         TextButton(
-                            onClick = { createAccount = !createAccount },
+                            enabled = !loading,
+                            onClick = { createAccount = !createAccount; error = null; status = null },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(

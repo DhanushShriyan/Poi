@@ -20,6 +20,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -32,6 +37,7 @@ class SupabaseMomentRepository(
     private val momentRows = MutableStateFlow<List<MomentRow>>(emptyList())
     private val likedMomentIds = MutableStateFlow<Set<String>>(emptySet())
     private val viewedMomentIds = mutableSetOf<String>()
+    private val publishMutex = Mutex()
 
     private val _moments = MutableStateFlow<List<EventMoment>>(emptyList())
     override val moments: StateFlow<List<EventMoment>> = _moments.asStateFlow()
@@ -43,24 +49,24 @@ class SupabaseMomentRepository(
 
     init {
         scope.launch {
-            cloud.supabase.from("event_moments")
-                .selectAsFlow(MomentRow::id)
-                .catch { emit(emptyList()) }
-                .collectLatest { rows ->
-                    momentRows.value = rows
-                    publishMoments(rows)
-                }
-        }
-        scope.launch {
-            cloud.supabase.from("moment_comments")
-                .selectAsFlow(CommentRow::id)
-                .catch { emit(emptyList()) }
-                .collectLatest(::publishComments)
-        }
-        scope.launch {
             authRepository.session.collectLatest {
+                momentRows.value = emptyList()
+                _moments.value = emptyList()
+                _comments.value = emptyList()
+                synchronized(viewedMomentIds) { viewedMomentIds.clear() }
                 refreshLikes()
-                publishMoments(momentRows.value)
+                coroutineScope {
+                    launch {
+                        cloud.supabase.from("event_moments").selectAsFlow(MomentRow::id)
+                            .retryWhen { _, attempt -> delay((attempt + 1).coerceAtMost(6) * 1000L); true }
+                            .collectLatest { rows -> momentRows.value = rows; refreshLikes(); publishMoments(rows) }
+                    }
+                    launch {
+                        cloud.supabase.from("moment_comments").selectAsFlow(CommentRow::id)
+                            .retryWhen { _, attempt -> delay((attempt + 1).coerceAtMost(6) * 1000L); true }
+                            .collectLatest(::publishComments)
+                    }
+                }
             }
         }
     }
@@ -159,7 +165,7 @@ class SupabaseMomentRepository(
             cloud.supabase.from("moment_views").insert(
                 MomentViewRow(momentId = momentId, userId = userId),
             )
-        }
+        }.onFailure { synchronized(viewedMomentIds) { viewedMomentIds.remove(momentId) } }
     }
 
     override suspend fun createShareUrl(moment: EventMoment): String =
@@ -190,7 +196,7 @@ class SupabaseMomentRepository(
         }
     }
 
-    private suspend fun publishMoments(rows: List<MomentRow>) {
+    private suspend fun publishMoments(rows: List<MomentRow>) = publishMutex.withLock {
         val currentUserId = authRepository.session.value.user?.id
         val liked = likedMomentIds.value
         val existingUrls = _moments.value.associate { it.imagePath to it.imageUrl }

@@ -26,6 +26,7 @@ import com.poi.core.poster.CloudPosterReader
 import io.github.jan.supabase.auth.auth
 
 class PoiApplication : Application() {
+    val feedbackRepository by lazy { com.poi.core.data.TripFeedbackRepository(cloudClient, authRepository) }
     val cloudPosterReader: CloudPosterReader? by lazy {
         cloudClient?.let { cloud ->
             CloudPosterReader(applicationContext, BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY) {
