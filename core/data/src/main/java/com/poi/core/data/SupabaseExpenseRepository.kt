@@ -113,15 +113,15 @@ class SupabaseExpenseRepository(
     }
 
     override suspend fun startGroup(eventId: String, currency: String): EventExpenseGroup = connectedOperation {
-        groupRows.value.firstOrNull {
-            it.eventId == eventId && it.createdBy == requireUserId()
-        }?.toModel() ?: run {
-            val userId = requireUserId()
-            val row = cloud.supabase.from("event_expense_groups").insert(
-                NewExpenseGroupRow(eventId = eventId, createdBy = userId, currency = currency),
-            ) { select() }.decodeSingle<ExpenseGroupRow>()
-            refresh()
-            row.toModel()
+        requireUserId()
+        val groupId = cloud.supabase.postgrest.rpc("get_or_start_poi_event_expense_group",
+            kotlinx.serialization.json.buildJsonObject {
+                put("p_event_id", kotlinx.serialization.json.JsonPrimitive(eventId))
+                put("p_currency", kotlinx.serialization.json.JsonPrimitive(currency))
+            }).decodeAs<String>()
+        refresh()
+        requireNotNull(_groups.value.firstOrNull { it.id == groupId }) {
+            "Shared event expenses could not be loaded. Refresh and retry."
         }
     }
 
@@ -275,7 +275,7 @@ class SupabaseExpenseRepository(
     }
 
     private suspend fun rebuild() = rebuildMutex.withLock {
-        _groups.value = groupRows.value.map(ExpenseGroupRow::toModel).sortedBy(EventExpenseGroup::createdAtMillis)
+        _groups.value = groupRows.value.map(ExpenseGroupRow::toModel).sortedWith(compareBy<EventExpenseGroup> { it.createdAtMillis }.thenBy { it.id })
         _members.value = memberRows.value.map(ExpenseMemberRow::toModel).sortedBy(ExpenseMember::displayName)
         val payments = paymentRows.value.groupBy(ExpenseAllocationRow::expenseId)
         val shares = shareRows.value.groupBy(ExpenseAllocationRow::expenseId)

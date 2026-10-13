@@ -218,15 +218,8 @@ fun EventExpensesScreen(
                         FilterChip(
                             selected = candidate.id == group?.id,
                             onClick = { selectedGroupId = candidate.id },
-                            label = { Text(if (candidate.createdBy == currentUserId) "My circle" else "${owner?.displayName ?: "Friend"}'s circle") },
+                            label = { Text(if (candidate.id == eventGroups.firstOrNull()?.id) "Shared event ledger" else "Existing ledger · ${owner?.displayName ?: "Member"}") },
                         )
-                    }
-                    if (eventGroups.none { it.createdBy == currentUserId }) {
-                        item {
-                            OutlinedButton(enabled = !busy, onClick = {
-                                runAction { selectedGroupId = repository.startGroup(eventId).id }
-                            }) { Text("New circle") }
-                        }
                     }
                 }
             }

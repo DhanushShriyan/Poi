@@ -6,7 +6,7 @@
 2. Create an account with your real Gmail/other email and password. Existing accounts use the same credentials in both clients. Google/SMS buttons are not working methods until their external providers are configured. Do not enter someone else's email or reuse an important password.
 3. Search for your friends in People, send a request, and accept from the other account.
 4. Create separate Goa and Munnar events with your real dates and locations. Private events require explicit invitations or an owner-issued guest join link on Android/web; friendship alone does not grant access. Public events expose details and albums; expenses remain group-private. For Android, use Share guest join link inside your event; on web, open the event and use Create guest join link. Send it only to intended guests. Friends open it, sign in, and tap Join invited event. Links last 30 days; replacement/revocation blocks further joins without removing already-joined members. A plain private event link opens only for existing members.
-5. Create an expense group, invite accepted friends and have each friend accept before including them in expenses. Verify every participant appears as active.
+5. Confirm everyone accepted the event invitation or joined its guest link. Confirmed members automatically get shared expense access; Interested/Going alone is not membership. Open shared expenses and verify all participants are active. New contributions use the same shared ledger. If older versions created several circles, use the ledger selector; existing charges and settlements stay in their original ledger.
 
 ## During the trip
 
@@ -27,7 +27,7 @@ Poster-to-event UI is hidden, not removed from the backend or source. No trip ev
 ## Specific event / iPhone regression checks
 
 1. Open an event link while signed out. Public events show a preview; private events do not expose their details. Sign in and ensure the intended event remains selected. Unknown/private IDs must not open a different event silently.
-2. The owner creates a join link for a private event. A nonfriend account joins using it, can see details/photos, but cannot see the owner's expenses until separately invited.
+2. The owner creates a join link for a private event. A nonfriend account joins using it, can see details/photos, and now also sees shared expenses without a separate expense invitation. Verify a nonmember still cannot see those expenses.
 3. Replace/revoke the link and verify the old link fails for new joins. Existing membership remains intact.
 4. Tap Open event on a card, then test location, full description, calendar export, photos and expenses. Owners test Edit event and invitations.
 5. Check the Calendar tab, optional January local calendar and Kannada switch. Profile contains theme/light-dark selection. Radius filtering requires foreground location and excludes unlocated events when enabled.

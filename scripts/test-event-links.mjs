@@ -18,7 +18,7 @@ try{
  assert.equal((await ok(b.from('events').select('id').eq('id',event.id))).length,1);
  assert.equal((await ok(b.from('attendance').select('event_id').eq('event_id',event.id))).length,0);
  const id=randomUUID(),path=`${event.id}/${bob.id}/${id}.png`;paths.push(path);await ok(b.storage.from('event-moments').upload(path,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aE1cAAAAASUVORK5CYII=','base64'),{contentType:'image/png'}));await ok(b.from('event_moments').insert({id,event_id:event.id,author_id:bob.id,author_name:'Temporary guest',image_path:path,caption:'Uploaded without attendance',created_at_millis:Date.now()}));
- await ok(a.from('event_expense_groups').insert({event_id:event.id,created_by:alice.id,currency:'INR'}));assert.equal((await ok(b.from('event_expense_groups').select('id').eq('event_id',event.id))).length,0);
+ await ok(a.from('event_expense_groups').insert({event_id:event.id,created_by:alice.id,currency:'INR'}));assert.equal((await ok(b.from('event_expense_groups').select('id').eq('event_id',event.id))).length,1);
  const replacement=await ok(a.rpc('create_poi_event_join_link',{p_event_id:event.id}));assert.notEqual(token,replacement);assert.ok((await b.rpc('join_poi_event_link',{p_token:token})).error);
  await ok(a.rpc('revoke_poi_event_join_link',{p_event_id:event.id}));assert.ok((await b.rpc('join_poi_event_link',{p_token:replacement})).error);assert.equal((await ok(b.from('events').select('id').eq('id',event.id))).length,1);
  console.log('PASS: non-owner/invalid links blocked; guest joins exact private event without friendship; repeated join idempotent; photo upload without attendance; expenses stay private; rotation/revocation blocks old tokens without removing joined members.');

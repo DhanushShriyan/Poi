@@ -528,7 +528,7 @@ fun EventDetailScreen(
         AlertDialog(
             onDismissRequest = { if (!creatingJoinLink) showShareJoinLink = false },
             title = { Text("Share a join link") },
-            text = { Text(joinLinkMessage ?: "Anyone you send this link to can sign in and join this event, including private events. Share only with your intended guests. The link expires in 30 days; creating a new link disables the previous link. Expenses still need a separate group invitation.") },
+            text = { Text(joinLinkMessage ?: "Anyone you send this link to can sign in and join this event, including private events, photos and shared expenses. Share only with your intended guests. The link expires in 30 days; creating a new link disables the previous link.") },
             confirmButton = {
                 TextButton(enabled = !creatingJoinLink, onClick = {
                     creatingJoinLink = true
